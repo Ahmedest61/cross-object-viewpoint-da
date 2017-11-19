@@ -1,2 +1,3 @@
-# viewpoint-domain-adaptation
-Viewpoint estimation for 2D images using domain adaptation
+# Viewpoint Estimation through Domain Adaptation
+
+Viewpoint estimation for 2D images using domain adaptation.
