@@ -5,9 +5,14 @@
 #include <unistd.h>
 #include <vector>
 #include <fstream>
+#include <stdlib.h>
 
+#define NUM_RENDS 150
+#define BACKGROUND false 
 #define PI 3.14159265358979
+#define VERSION 1
 
+// Input args
 std::vector<std::string> *mesh_filepaths;
 std::string output_dir;
 int width;
@@ -22,48 +27,43 @@ void captureImages(igl::viewer::Viewer& viewer) {
   Eigen::Matrix<unsigned char, Eigen::Dynamic, Eigen::Dynamic> A(width, height);
 
   // Initialize vars needed for camera rotations
-  bool background = true;
-  int x_jumps = 7;
-  float x_angles[x_jumps];
-  x_angles[0] = PI/2;
-  x_angles[1] = PI/3;
-  x_angles[2] = PI/6;
-  x_angles[3] = 0;
-  x_angles[4] = -PI/6;
-  x_angles[5] = -PI/3;
-  x_angles[6] = -PI/2;
-  int y_jumps = 30;
   Eigen::Matrix3f xRotate;
   Eigen::Matrix3f yRotate;
+  Eigen::Matrix3f zRotate;
   std::cout << "Rendering images for " << mesh_filepaths->size() 
     << " models" << std::endl;
-  
+
+  // Create output directory
+  std::stringstream new_dir;
+  new_dir << output_dir << "/" << "V" << VERSION;
+  std::stringstream new_dir_cmd;
+  new_dir_cmd << "mkdir " << new_dir.str();
+  const char* cmd = (new_dir_cmd.str()).c_str();
+  system(cmd);
+
+  // Create output annotation file
+  std::stringstream annot_name;
+  annot_name << new_dir.str() << "/" << "annots" << ".txt";
+  std::ofstream annotFile;
+  annotFile.open(annot_name.str());
+
+  int model_ctr = 0;
   for (int i = 0; i < mesh_filepaths->size(); i++) {
 
-    std::cout << i+1 << std::endl;
     // Load mesh
+    std::cout << "Model: " << i+1 << "/" << mesh_filepaths->size() << std::endl;
     std::string mesh_fp = mesh_filepaths->at(i);
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     igl::readOBJ(mesh_fp, V, F);
 
-    // Create output directory
-    std::stringstream new_dir;
-    std::string filename = mesh_fp.substr(0, mesh_fp.size()-4);
-    int begin = filename.rfind('/');
-    filename = filename.substr(begin + 1);
-    new_dir << output_dir << "/" << filename;
-    std::stringstream new_dir_cmd;
-    new_dir_cmd << "mkdir " << new_dir.str();
-    const char* cmd = (new_dir_cmd.str()).c_str();
-    system(cmd);
-
     // Orient so image facing forwards
-    //   TODO: hardcoded. need to read from metadata file
-    double angle_x = -1.57;
-    double angle_y = 1.57;
+    double angle_x = 1.57;
+    double angle_y = 0;
+    double angle_z = -1.57;
     Eigen::MatrixXd rotation_x(3,3);
     Eigen::MatrixXd rotation_y(3,3);
+    Eigen::MatrixXd rotation_z(3,3);
     rotation_x << 
       1, 0, 0,
       0, std::cos(angle_x), std::sin(angle_x),
@@ -72,8 +72,13 @@ void captureImages(igl::viewer::Viewer& viewer) {
       std::cos(angle_y), 0, 0-std::sin(angle_y),
       0, 1, 0,
       std::sin(angle_y), 0, std::cos(angle_y);
+    rotation_z <<
+      cos(angle_z), sin(angle_z), 0,
+      -sin(angle_z), cos(angle_z), 0,
+      0, 0, 1;
     V = V * rotation_x;
     V = V * rotation_y;
+    V = V * rotation_z;
 
     // Draw mesh to viewer
     viewer.data.clear();
@@ -81,49 +86,65 @@ void captureImages(igl::viewer::Viewer& viewer) {
     viewer.core.align_camera_center(viewer.data.V,viewer.data.F);
     viewer.draw();
 
-    // Render in multiple views
+    // Perform NUM_RENDS random renderings
     int im_ctr = 0;
-    for (int j = 0; j < x_jumps; j++) {
+    for (int j = 0; j < NUM_RENDS; j++) {
+
+      // Generate rendering parameters
+      float elevation = rand() % 135;
+      float azimuth = rand() % 360;
+      float elevation_rad = elevation * PI/180;
+      float azimuth_rad = azimuth * PI/180;
+
+      // Calc rotations
       xRotate << 
         1, 0, 0,
-        0, std::cos(x_angles[j]), std::sin(x_angles[j]),
-        0, 0-std::sin(x_angles[j]), std::cos(x_angles[j]);
+        0, std::cos(elevation_rad), std::sin(elevation_rad),
+        0, 0-std::sin(elevation_rad), std::cos(elevation_rad);
+      zRotate <<
+        std::cos(azimuth_rad), std::sin(azimuth_rad), 0,
+        -std::sin(azimuth_rad), std::cos(azimuth_rad), 0,
+        0, 0, 1;
 
-      for (int k = 0; k < y_jumps; k++) {
-        float y_angle = ((2*PI)/float(y_jumps))*float(k);
-        yRotate <<
-          std::cos(y_angle), 0, -std::sin(y_angle),
-          0, 1, 0,
-          std::sin(y_angle), 0, std::cos(y_angle);
+      // TODO: vary zoom
 
-        // Rotate mesh and render
-        Eigen::Quaternionf rot(xRotate*yRotate);
-        viewer.core.trackball_angle = rot;
-        viewer.draw();
+      // Rotate mesh and render
+      Eigen::Quaternionf rot(xRotate*zRotate);
+      viewer.core.trackball_angle = rot;
+      viewer.draw();
 
-        // Draw view to RGBA buffers
-        viewer.core.draw_buffer(viewer.data, viewer.opengl, false, R,G,B,A);
+      // Draw view to RGBA buffers
+      viewer.core.draw_buffer(viewer.data, viewer.opengl, false, R,G,B,A);
 
-        // If desired, include background in screenshot
-        if (background) {
-          for (int y = 0; y < A.rows(); y++) {
-            for (int z = 0; z < A.cols(); z++) {
-              A(y,z) = char(255);
-            }
+      // If desired, include background in screenshot
+      if (BACKGROUND) {
+        for (int y = 0; y < A.rows(); y++) {
+          for (int z = 0; z < A.cols(); z++) {
+            A(y,z) = char(255);
           }
         }
-
-        // Take PNG screenshot and save to file
-        std::stringstream out_name;
-        out_name << new_dir.str() << "/" << im_ctr << ".png";
-        igl::png::writePNG(R,G,B,A,out_name.str());
-        im_ctr++;
       }
+
+      // Take PNG screenshot and save to file
+      std::stringstream out_name;
+      out_name << new_dir.str() << "/" << model_ctr << "_" << im_ctr << ".png";
+      igl::png::writePNG(R,G,B,A,out_name.str());
+
+      // Write annotation
+      float outElevation = -1 * (elevation - 135) - 45;
+      float outAzimuth = azimuth;
+      annotFile << model_ctr << "_" << im_ctr << "," << outElevation << "," << outAzimuth << std::endl;
+      im_ctr++;
+
     }
+
+    // Reset for next model
     viewer.data.V = Eigen::MatrixXd();
     viewer.data.F = Eigen::MatrixXi();
+    model_ctr++;
   }
   std::cout << "--RENDERING FINISHED--" << std::endl;
+  annotFile.close();
 }
 
 bool key_down(igl::viewer::Viewer& viewer, unsigned char key, int modifier) {
