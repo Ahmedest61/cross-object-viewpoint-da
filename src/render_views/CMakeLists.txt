@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
-project(multi-view-rendering)
+project(render_views)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
