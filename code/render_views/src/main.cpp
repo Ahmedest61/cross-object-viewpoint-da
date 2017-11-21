@@ -10,13 +10,13 @@
 #define NUM_RENDS 150
 #define BACKGROUND false 
 #define PI 3.14159265358979
-#define VERSION 1
 
 // Input args
 std::vector<std::string> *mesh_filepaths;
 std::string output_dir;
 int width;
 int height;
+std::string version;
 
 void captureImages(igl::viewer::Viewer& viewer) {
 
@@ -35,7 +35,7 @@ void captureImages(igl::viewer::Viewer& viewer) {
 
   // Create output directory
   std::stringstream new_dir;
-  new_dir << output_dir << "/" << "V" << VERSION;
+  new_dir << output_dir << "/" << "V" << version;
   std::stringstream new_dir_cmd;
   new_dir_cmd << "mkdir " << new_dir.str();
   const char* cmd = (new_dir_cmd.str()).c_str();
@@ -172,10 +172,10 @@ int main(int argc, char *argv[])
 {
 
   // Get command line args
-  if (argc < 5) {
+  if (argc < 6) {
     std::cout << "~~ERROR~~" << std::endl;
     std::cout << 
-      "Usage: ./bin FILEPATH_OF_LIST_OF_FILES.txt OUTPUT_DIRECTORY WIDTH HEIGHT" 
+      "Usage: ./bin FILEPATH_OF_LIST_OF_FILES.txt OUTPUT_DIRECTORY WIDTH HEIGHT VERSION_NAME"
       << std::endl;
     return -1;
   }
@@ -184,6 +184,7 @@ int main(int argc, char *argv[])
   mesh_filepaths = readLines(mesh_listing_file);
   width = std::atoi(argv[3]);
   height = std::atoi(argv[4]);
+  version = argv[5];
 
   // Bring up viewer and prep for capture
   Eigen::MatrixXd V;
