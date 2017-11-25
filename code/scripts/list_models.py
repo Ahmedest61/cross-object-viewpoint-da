@@ -1,3 +1,4 @@
+# Script to list complete filepaths of model within a given ShapeNet class dir" 
 
 import os
 
