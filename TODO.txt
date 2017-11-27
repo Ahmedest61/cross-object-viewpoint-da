@@ -4,4 +4,5 @@ Network:
 - Fix rendered dataloader to output label in proper format
     - remember to take bins into consideration
     - 'AZIMUTH_BINS * ELEVATION_BINS' size vector
-- Write basic geometric loss function
+- Update splitter script to include validation set
+- Write basic geometric loss function to replace CrossEntropyLoss
