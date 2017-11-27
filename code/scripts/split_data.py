@@ -32,9 +32,9 @@ split_test = random.sample(models, num_test)
 
 # Determine val split
 num_val = int(num_models * val_percent)
-remaining = list(set(model) - set(split_test))
+remaining = list(set(models) - set(split_test))
 split_val = random.sample(remaining, num_val)
-split_train = list(set(remaining)) - set(split_val))
+split_train = list(set(remaining) - set(split_val))
 
 # Write split files
 train_fp = os.path.join(data_dir, "train_split.txt")
