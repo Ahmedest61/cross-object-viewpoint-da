@@ -32,7 +32,18 @@ def create_rend_dataloader(data_dir, data_labels_fp):
   return dataloader
 
 def create_model():
-  model = models.resnet18(pretrained=config.PRETRAINED)
+  res_v = config.RESNET_LAYERS
+  if res_v == 18:
+    model = models.resnet18(pretrained=config.PRETRAINED)
+  elif res_v == 34:
+    model = models.resnet34(pretrained=config.PRETRAINED)
+  elif res_v == 50:
+    model = models.resnet50(pretrained=config.PRETRAINED)
+  elif res_v == 101:
+    model = models.resnet101(pretrained=config.PRETRAINED)
+  elif res_v == 152:
+    model = models.resnet152(pretrained=config.PRETRAINED)
+
   out_classes = config.AZIMUTH_BINS * config.ELEVATION_BINS
   model.fc = nn.Linear(model.fc.in_features, out_classes)
   return model

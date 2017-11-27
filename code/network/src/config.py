@@ -13,6 +13,7 @@ AZIMUTH_BINS = 360
 ELEVATION_BINS = 135
 
 # Learning parameters
+RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
 EPOCHS = 50
@@ -43,6 +44,7 @@ def PRINT_CONFIG():
   print ""
 
   print "~~LEARNING PARAMS~~"
+  print "RESNET_LAYERS:\t", RESNET_LAYERS
   print "PRETRAINED:\t", PRETRAINED
   print "BATCH_SIZE:\t", BATCH_SIZE
   print "EPOCHS:\t", EPOCHS
