@@ -15,10 +15,10 @@ ELEVATION_BINS = 135
 # Learning parameters
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 80
+EPOCHS = 50
 LEARNING_RATE = 0.001
 MOMENTUM = 0.9
-STEP_SIZE = 10
+STEP_SIZE = 8
 GAMMA = 0.1
 
 # Debugging print method

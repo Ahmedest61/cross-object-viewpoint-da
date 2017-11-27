@@ -26,10 +26,11 @@ class RenderedDataset(Dataset):
     lines = data_labels_f.readlines()
     data_labels_f.close()
     self.images = {}
+    ims_set = set(self.ims_list)
     for l in lines:
       split = l.strip().split(",")
       im_name = "{}.png".format(split[0])
-      if im_name in self.ims_list:
+      if im_name in ims_set:
         self.images[im_name] = [int(split[1]), int(split[2])]
 
     # Save transform
@@ -47,7 +48,7 @@ class RenderedDataset(Dataset):
     # Fetch annot
     annot = self.images[im_name]    #(azimuth, elevation)
     num_bins = config.AZIMUTH_BINS * config.ELEVATION_BINS
-    ind = config.ELEVATION_BINS*annot[0] + ((config.ELEVATION_BINS - 90) + annot[1])
+    ind = config.ELEVATION_BINS*annot[0] + ((config.ELEVATION_BINS - 90) + annot[1] - 1)
 
     # Return sample
     sample = {"image": image, "annot": ind}

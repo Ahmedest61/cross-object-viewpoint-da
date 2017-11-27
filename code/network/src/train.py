@@ -111,7 +111,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
 
   # Finish up
   time_elapsed = time.time() - init_time
-  log_print("BEST EPOCH: %i/%i - Loss: %f \t Acc: %f" % (best_epoch+1, epochs, best_loss, best_acc))
+  log_print("BEST EPOCH: %i/%i - Loss: %f   Acc: %f" % (best_epoch+1, epochs, best_loss, best_acc))
   log_print("Training completed in %sm %ss" % (time_elapsed // 60, time_elapsed % 60))
   model.load_state_dict(best_weights)
   return model
@@ -194,10 +194,8 @@ def main():
                                        gamma=config.GAMMA)
 
   # Perform training
-  print "~"*20
-  log_print("!!!Starting training!!!")
+  log_print("!!!!!Starting training!!!!!")
   model = train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, config.EPOCHS)
-  print "~"*20
   
   # Save model weights
   log_print("Saving model weights to %s..." % config.OUT_WEIGHTS_FP)
@@ -210,8 +208,9 @@ def main():
     create_rend_dataloader(test_ims_dir, config.DATA_LABELS_FP)
 
   # Test and report accuracy
-  log_print("Testing model on test set...")
-  accuracy = test_model(model, test_dataloader, loss_f)
+  if config.TEST_AFTER_TRAIN:
+    log_print("Testing model on test set...")
+    accuracy = test_model(model, test_dataloader, loss_f)
 
   log_print("Script DONE!")
 
