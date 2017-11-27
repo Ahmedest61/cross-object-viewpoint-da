@@ -44,10 +44,10 @@ class RenderedDataset(Dataset):
     im_fp = os.path.join(self.data_dir, im_name)
     image = cv2.imread(im_fp)
 
-    # Fetch annot (create vector)
-    annot = self.images[im_name]    #(elevation, azimuth)
+    # Fetch annot
+    annot = self.images[im_name]    #(azimuth, elevation)
     num_bins = config.AZIMUTH_BINS * config.ELEVATION_BINS
-    ind = config.ELEVATION_BINS*annot[1] + ((config.ELEVATION_BINS - 90) + annot[0])
+    ind = config.ELEVATION_BINS*annot[0] + ((config.ELEVATION_BINS - 90) + annot[1])
 
     # Return sample
     sample = {"image": image, "annot": ind}

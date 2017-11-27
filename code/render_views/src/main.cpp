@@ -131,9 +131,9 @@ void captureImages(igl::viewer::Viewer& viewer) {
       igl::png::writePNG(R,G,B,A,out_name.str());
 
       // Write annotation
-      float outElevation = -1 * (elevation - 135) - 45;
       float outAzimuth = azimuth;
-      annotFile << model_ctr << "_" << im_ctr << "," << outElevation << "," << outAzimuth << std::endl;
+      float outElevation = -1 * (elevation - 135) - 45;
+      annotFile << model_ctr << "_" << im_ctr << "," << outAzimuth << "," << outElevation << std::endl;
       im_ctr++;
 
     }
