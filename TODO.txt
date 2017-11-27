@@ -1,0 +1,7 @@
+    TODO
+
+Network:
+- Fix rendered dataloader to output label in proper format
+    - remember to take bins into consideration
+    - 'AZIMUTH_BINS * ELEVATION_BINS' size vector
+- Write basic geometric loss function

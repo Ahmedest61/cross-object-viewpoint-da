@@ -1,6 +1,6 @@
 # Filepaths
-DATA_DIR = "../../data/shapenet/chair/V1"
-DATA_LABELS_FP = "../../data/shapenet/chair/V1/annots.txt"
+DATA_DIR = "../../../data/shapenet/chair/V1"
+DATA_LABELS_FP = "../../../data/shapenet/chair/V1/annots.txt"
 
 # Program parameters
 GPU = True
@@ -11,8 +11,12 @@ ELEVATION_BINS = 135
 
 # Learning parameters
 PRETRAINED = True
-MAX_EPOCHS = 20
 BATCH_SIZE = 30
+EPOCHS = 20
+LEARNING_RATE = 0.001
+MOMENTUM = 0.9
+STEP_SIZE = 7
+GAMMA = 0.1
 
 # Debugging print method
 def PRINT_CONFIG():
@@ -34,7 +38,12 @@ def PRINT_CONFIG():
 
   print "~~LEARNING PARAMS~~"
   print "PRETRAINED:\t", PRETRAINED
-  print "MAX_EPOCHS:\t", MAX_EPOCHS
   print "BATCH_SIZE:\t", BATCH_SIZE
+  print "EPOCHS:\t", EPOCHS
+  print "LEARNING_RATE:\t", LEARNING_RATE
+  print "MOMENTUM:\t", MOMENTUM
+  print "STEP_SIZE:\t", STEP_SIZE
+  print "GAMMA:\t", GAMMA
+  print ""
 
   print "~~~~~~ END CONFIG ~~~~~~"
