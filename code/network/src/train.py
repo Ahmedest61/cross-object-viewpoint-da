@@ -6,13 +6,13 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.autograd import Variable
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision import transforms, models
 
 # Imports from src files
 from dataset_rend import RenderedDataset
-#from transform_rend import ToTensor
 
 #####################
 #   BEGIN HELPERS   #
@@ -45,10 +45,9 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
   best_epoch = -1
 
   for epoch in xrange(epochs):
-    log_print("Epoch %i/%i" % (epoch, epochs-1))
+    log_print("Epoch %i/%i" % (epoch+1, epochs))
 
     for phase in ["train", "val"]:
-      log_print("Phase - %s" % phase)
       if phase == "train":
         explorer.step()
         model.train(True)
@@ -62,23 +61,23 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
       print_interval = 100
       batch_count = 0
       for data in dataloader:
-        inputs, labels = data
+        inputs, annots = data['image'], data['annot']
 
         # Wrap as pytorch autograd Variable
         if config.GPU and torch.cuda.is_available():
           inputs = Variable(inputs.cuda())
-          labels = Variable(labels.cuda())
+          annots = Variable(annots.cuda())
         else:
           inputs = Variable(inputs)
-          labels = Variable(labels)
+          annots= Variable(annots)
 
         # Forward pass and calculate loss
         optimizer.zero_grad()
         outputs = model(inputs)
         _, preds = torch.max(outputs.data, 1)
-        loss = loss_f(preds, labels)
+        loss = loss_f(outputs, annots)
         curr_loss += loss.data[0]
-        curr_corect += torch.sum(preds == labels.data)
+        curr_correct += torch.sum(preds == annots.data)
 
         # Backward pass (if train)
         if phase == "train":
@@ -86,21 +85,22 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
           optimizer.step()
 
         # Output
-        if batch_count % print_interval-1:
+        #if batch_count != 0 and batch_count % (print_interval-1) == 0:
+        if batch_count % print_interval == 0 and batch_count != 0:
           epoch_loss += curr_loss
           epoch_correct += curr_correct
           if phase == "train":
             curr_loss = float(curr_loss) / float(print_interval*config.BATCH_SIZE)
             curr_correct = float(curr_correct) / float(print_interval*config.BATCH_SIZE)
-            log_print("Last %i batches...\t Avg Loss: %f \t Acc: %f" % (print_interval, curr_loss, curr_correct))
+            log_print("\tBatches %i-%i -\tLoss: %f \t Acc: %f" % (batch_count-print_interval+1, batch_count, curr_loss, curr_correct))
           curr_loss = curr_correct = 0
         batch_count += 1
       
       # Report epoch results
-      num_images = len(dataloader.data)
+      num_images = len(dataloader.dataset)
       epoch_loss = float(epoch_loss) / float(num_images)
       epoch_acc = float(epoch_correct) / float(num_images)
-      log_print("EPOCH %i [%s] - Loss: %f \t Acc: %f" % (epoch, phase, epoch_loss, epoch_acc))
+      log_print("\tEPOCH %i [%s] - Loss: %f \t Acc: %f" % (epoch+1, phase, epoch_loss, epoch_acc))
 
       # Save best model weights from epoch
       if phase == "val" and epoch_acc >= best_acc:
@@ -130,6 +130,7 @@ def main():
 
   # Redirect output to log file
   sys.stdout = open(config.OUT_LOG_FP, 'w')
+  sys.stderr = sys.stdout
   log_print("Beginning script...")
 
   # Print beginning debug info
@@ -168,10 +169,13 @@ def main():
                                        gamma=config.GAMMA)
 
   # Perform training
+  print "~"*20
   log_print("!!!Starting training!!!")
   model = train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, config.EPOCHS)
+  print "~"*20
   
   # Save model weights
+  log_print("Saving model weights to %s..." % config.OUT_WEIGHTS_FP)
   save_model_weights(model, config.OUT_WEIGHTS_FP)
 
   # Create testing DataLoader

@@ -1,6 +1,8 @@
 import os
 import cv2
 import torch
+import config
+import numpy as np
 from torch.utils.data import Dataset
 
 class RenderedDataset(Dataset):
@@ -37,10 +39,18 @@ class RenderedDataset(Dataset):
     return len(self.ims_list)
 
   def __getitem__(self, idx):
+    # Fetch image
     im_name = self.ims_list[idx]
     im_fp = os.path.join(self.data_dir, im_name)
     image = cv2.imread(im_fp)
-    sample = {"image": image, "annot": self.images[im_name]}
+
+    # Fetch annot (create vector)
+    annot = self.images[im_name]    #(elevation, azimuth)
+    num_bins = config.AZIMUTH_BINS * config.ELEVATION_BINS
+    ind = config.ELEVATION_BINS*annot[1] + ((config.ELEVATION_BINS - 90) + annot[0])
+
+    # Return sample
+    sample = {"image": image, "annot": ind}
     if self.transform:
-        sample = self.transform(sample)
+        sample["image"] = self.transform(sample["image"])
     return sample
