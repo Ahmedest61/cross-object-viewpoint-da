@@ -1,6 +1,9 @@
 # Filepaths
+RUN_NAME = "TEST_1"
 DATA_DIR = "../../../data/shapenet/chair/V1"
 DATA_LABELS_FP = "../../../data/shapenet/chair/V1/annots.txt"
+OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
+OUT_LOG_FP = "../logs/%s.log" % RUN_NAME
 
 # Program parameters
 GPU = True
@@ -24,8 +27,11 @@ def PRINT_CONFIG():
   print " "
 
   print "~~FILEPATHS~~"
+  print "RUN_NAME:\t", RUN_NAME
   print "DATA_DIR:\t", DATA_DIR
   print "DATA_LABELS_FP:\t", DATA_LABELS_FP
+  print "OUT_WEIGHTS_FP:\t", OUT_WEIGHTS_FP
+  print "OUT_LOG_FP:\t", OUT_LOG_FP
   print " "
 
   print "~~PROGRAM PARAMS~~"

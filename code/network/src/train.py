@@ -1,6 +1,8 @@
 import os
+import sys
 import config
 import datetime
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,6 +17,9 @@ from dataset_rend import RenderedDataset
 #####################
 #   BEGIN HELPERS   #
 #####################
+
+def log_print(string):
+  print "[%s]\t %s" % (datetime.datetime.now(), string)
 
 def create_rend_dataloader(data_dir, data_labels_fp):
   dataset = RenderedDataset(data_dir=data_dir, 
@@ -32,7 +37,88 @@ def create_model():
   model.fc = nn.Linear(model.fc.in_features, out_classes)
   return model
 
-def train_model(model, loss, optimizer, explorer, num_epochs):
+def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, epochs):
+
+  init_time = time.time()
+  best_acc = 0.0
+  best_weights = model.state_dict()
+  best_epoch = -1
+
+  for epoch in xrange(epochs):
+    log_print("Epoch %i/%i" % (epoch, epochs-1))
+
+    for phase in ["train", "val"]:
+      log_print("Phase - %s" % phase)
+      if phase == "train":
+        explorer.step()
+        model.train(True)
+        dataloader = train_dataloader
+      else:
+        model.train(False)
+        dataloader = val_dataloader
+
+      # Iterate over dataset
+      epoch_loss = epoch_correct = curr_loss = curr_correct = 0
+      print_interval = 100
+      batch_count = 0
+      for data in dataloader:
+        inputs, labels = data
+
+        # Wrap as pytorch autograd Variable
+        if config.GPU and torch.cuda.is_available():
+          inputs = Variable(inputs.cuda())
+          labels = Variable(labels.cuda())
+        else:
+          inputs = Variable(inputs)
+          labels = Variable(labels)
+
+        # Forward pass and calculate loss
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        _, preds = torch.max(outputs.data, 1)
+        loss = loss_f(preds, labels)
+        curr_loss += loss.data[0]
+        curr_corect += torch.sum(preds == labels.data)
+
+        # Backward pass (if train)
+        if phase == "train":
+          loss.backward()
+          optimizer.step()
+
+        # Output
+        if batch_count % print_interval-1:
+          epoch_loss += curr_loss
+          epoch_correct += curr_correct
+          if phase == "train":
+            curr_loss = float(curr_loss) / float(print_interval*config.BATCH_SIZE)
+            curr_correct = float(curr_correct) / float(print_interval*config.BATCH_SIZE)
+            log_print("Last %i batches...\t Avg Loss: %f \t Acc: %f" % (print_interval, curr_loss, curr_correct))
+          curr_loss = curr_correct = 0
+        batch_count += 1
+      
+      # Report epoch results
+      num_images = len(dataloader.data)
+      epoch_loss = float(epoch_loss) / float(num_images)
+      epoch_acc = float(epoch_correct) / float(num_images)
+      log_print("EPOCH %i [%s] - Loss: %f \t Acc: %f" % (epoch, phase, epoch_loss, epoch_acc))
+
+      # Save best model weights from epoch
+      if phase == "val" and epoch_acc >= best_acc:
+        best_acc = epoch_acc
+        best_weights = model.state_dict()
+        best_epoch = epoch
+
+  # Finish up
+  time_elapsed = time.time() - init_time
+  log_print("Training completed in %sm %ss" % (time_elapsed // 60, time_elapsed % 60))
+  model.load_state_dict(best_weights)
+  return model
+
+def save_model_weights(model, filepath):
+  #TODO
+  pass
+
+def test_model(model, test_dataloader):
   #TODO
   pass
 
@@ -42,37 +128,38 @@ def train_model(model, loss, optimizer, explorer, num_epochs):
 
 def main():
 
+  # Redirect output to log file
+  sys.stdout = open(config.OUT_LOG_FP, 'w')
+  log_print("Beginning script...")
+
   # Print beginning debug info
-  print "Beginning training process at..."
-  print datetime.datetime.now()
+  log_print("Printing config file...")
   config.PRINT_CONFIG()
 
   # Create training DataLoader
-  print "Loading training data..."
+  log_print("Loading training data...")
   train_ims_dir = os.path.join(config.DATA_DIR, 'train')
   train_dataloader =  \
     create_rend_dataloader(train_ims_dir, config.DATA_LABELS_FP)
 
-  """
   # Create validation DataLoader
-  print "Loading validation data..."
-  validate_ims_dir = os.path.join(config.DATA_DIR, 'val')
-  validate_dataloader = \
-    create_rend_dataloader(validate_ims_dir, config.DATA_LABELS_FP)
-  """
+  log_print("Loading validation data...")
+  val_ims_dir = os.path.join(config.DATA_DIR, 'val')
+  val_dataloader = \
+    create_rend_dataloader(val_ims_dir, config.DATA_LABELS_FP)
 
   # Set up model for training
-  print "Creating model..."
+  log_print("Creating model...")
   model = create_model()
   if config.GPU and torch.cuda.is_available():
-    print "Enabling GPU"
+    log_print("Enabling GPU")
     if config.MULTI_GPU and torch.cuda.device_count() > 1:
-      print "Using multiple GPUs:", torch.cuda.device_count()
+      log_print("Using multiple GPUs: %i" % torch.cuda.device_count())
       model = nn.DataParallel(model)
     model = model.cuda()
 
   # Set up loss and optimizer
-  loss= nn.CrossEntropyLoss()
+  loss_f = nn.CrossEntropyLoss()
   optimizer = optim.SGD(model.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
@@ -81,16 +168,20 @@ def main():
                                        gamma=config.GAMMA)
 
   # Perform training
-  print "!!!Starting training!!!"
-  model = train_model(model, loss, optimizer, explorer, config.EPOCHS)
+  log_print("!!!Starting training!!!")
+  model = train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, config.EPOCHS)
+  
+  # Save model weights
+  save_model_weights(model, config.OUT_WEIGHTS_FP)
 
   # Create testing DataLoader
-  print "Loading testing data..."
-  train_ims_dir = os.path.join(config.DATA_DIR, 'test')
-  train_dataloader =  \
-    create_rend_dataloader(train_ims_dir, config.DATA_LABELS_FP)
+  log_print("Loading testing data...")
+  test_ims_dir = os.path.join(config.DATA_DIR, 'test')
+  test_dataloader =  \
+    create_rend_dataloader(test_ims_dir, config.DATA_LABELS_FP)
 
-  #TODO: test accuracy
+  # Test and report accuracy
+  accuracy = test_model(model, test_dataloader)
 
 if __name__ == "__main__":
     main()
