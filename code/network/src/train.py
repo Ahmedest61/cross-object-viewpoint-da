@@ -98,25 +98,26 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
       
       # Report epoch results
       num_images = len(dataloader.dataset)
-      epoch_loss = float(epoch_loss) / float(num_images)
-      epoch_acc = float(epoch_correct) / float(num_images)
-      log_print("\tEPOCH %i [%s] - Loss: %f \t Acc: %f" % (epoch+1, phase, epoch_loss, epoch_acc))
+      epoch_loss = float(epoch_loss+curr_loss) / float(num_images)
+      epoch_acc = float(epoch_correct+curr_correct) / float(num_images)
+      log_print("\tEPOCH %i [%s] - Loss: %f   Acc: %f" % (epoch+1, phase, epoch_loss, epoch_acc))
 
       # Save best model weights from epoch
       if phase == "val" and epoch_acc >= best_acc:
         best_acc = epoch_acc
+        best_loss = epoch_loss
         best_weights = model.state_dict()
         best_epoch = epoch
 
   # Finish up
   time_elapsed = time.time() - init_time
+  log_print("BEST EPOCH: %i/%i - Loss: %f \t Acc: %f" % (best_epoch+1, epochs, best_loss, best_acc))
   log_print("Training completed in %sm %ss" % (time_elapsed // 60, time_elapsed % 60))
   model.load_state_dict(best_weights)
   return model
 
 def save_model_weights(model, filepath):
-  #TODO
-  pass
+  torch.save(model.state_dict(), filepath)
 
 def test_model(model, test_dataloader):
   #TODO
@@ -185,7 +186,10 @@ def main():
     create_rend_dataloader(test_ims_dir, config.DATA_LABELS_FP)
 
   # Test and report accuracy
+  log_print("Testing model on test set...")
   accuracy = test_model(model, test_dataloader)
+
+  log_print("Script DONE!")
 
 if __name__ == "__main__":
     main()

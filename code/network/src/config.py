@@ -1,5 +1,5 @@
 # Filepaths
-RUN_NAME = "TEST_1"
+RUN_NAME = "rend_only_chair_1"
 DATA_DIR = "../../../data/shapenet/chair/V1"
 DATA_LABELS_FP = "../../../data/shapenet/chair/V1/annots.txt"
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
@@ -15,10 +15,10 @@ ELEVATION_BINS = 135
 # Learning parameters
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 20
+EPOCHS = 80
 LEARNING_RATE = 0.001
 MOMENTUM = 0.9
-STEP_SIZE = 7
+STEP_SIZE = 10
 GAMMA = 0.1
 
 # Debugging print method
