@@ -1,4 +1,4 @@
-# Script to split list of renderings .pngs into a training and testing set
+# Script to split list of renderings .pngs into a training, validation, and testing set
 
 import os
 import shutil
@@ -6,6 +6,7 @@ import random
 
 # Input vars
 MOVE = True
+val_percent = .15
 test_percent = .15
 data_dir = "../../data/shapenet/chair/V1"
 
@@ -28,7 +29,12 @@ models = ims_dict.keys()
 num_models = len(models)
 num_test = int(num_models * test_percent)
 split_test = random.sample(models, num_test)
-split_train = list(set(models) - set(split_test))
+
+# Determine val split
+num_val = int(num_models * val_percent)
+remaining = list(set(model) - set(split_test))
+split_val = random.sample(remaining, num_val)
+split_train = list(set(remaining)) - set(split_val))
 
 # Write split files
 train_fp = os.path.join(data_dir, "train_split.txt")
@@ -37,6 +43,13 @@ for t in split_train:
     for i in ims_dict[t]:
         train_f.write("%s\n" % i)
 train_f.close()
+
+val_fp = os.path.join(data_dir, "val_split.txt")
+val_f = open(val_fp, 'w')
+for t in split_val:
+    for i in ims_dict[t]:
+        val_f.write("%s\n" % i)
+val_f.close()
 
 test_fp = os.path.join(data_dir, "test_split.txt")
 test_f = open(test_fp, 'w')
@@ -49,9 +62,12 @@ test_f.close()
 if MOVE:
     # Create dirs
     train_dir = os.path.join(data_dir, "train")
+    val_dir = os.path.join(data_dir, "val")
     test_dir = os.path.join(data_dir, "test")
     if not os.path.exists(train_dir):
         os.makedirs(train_dir)
+    if not os.path.exists(val_dir):
+        os.makedirs(val_dir)
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
 
@@ -62,7 +78,12 @@ if MOVE:
                 src_fp = os.path.join(data_dir, i)
                 dest_fp = os.path.join(train_dir, i)
                 shutil.move(src_fp, dest_fp)
-        else:
+        elif m in split_val:
+            for i in ims_dict[m]:
+                src_fp = os.path.join(data_dir, i)
+                dest_fp = os.path.join(val_dir, i)
+                shutil.move(src_fp, dest_fp)
+        elif m in split_test:
             for i in ims_dict[m]:
                 src_fp = os.path.join(data_dir, i)
                 dest_fp = os.path.join(test_dir, i)
