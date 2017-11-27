@@ -26,7 +26,7 @@ class RenderedDataset(Dataset):
     self.images = {}
     for l in lines:
       split = l.strip().split(",")
-      im_name = "%s.png" % split[0]
+      im_name = "{}.png".format(split[0])
       if im_name in self.ims_list:
         self.images[im_name] = [int(split[1]), int(split[2])]
 

@@ -7,7 +7,7 @@ from torchvision import transforms, utils
 
 # Imports from src files
 from dataset_rend import RenderedDataset
-from transform_rend import ToTensor
+#from transform_rend import ToTensor
 
 #####################
 #   BEGIN HELPERS   #
@@ -16,12 +16,16 @@ from transform_rend import ToTensor
 def create_rend_dataloader(data_dir, data_labels_fp):
   dataset = RenderedDataset(data_dir=data_dir, 
                             data_labels_fp=data_labels_fp,
-                            transform=transforms.Compose([ToTensor()]))
+                            transform=transforms.Compose([transforms.ToTensor()]))
   dataloader = DataLoader(dataset, 
                           batch_size=config.BATCH_SIZE, 
                           shuffle=True,
                           num_workers=4)
   return dataloader
+
+def train_model(model, criterion, optimizer, scheduler, num_epochs):
+  #TODO
+  pass
 
 #####################
 #    END HELPERS    #
@@ -39,10 +43,14 @@ def main():
   train_dataloader =  \
     create_rend_dataloader(train_ims_dir, config.DATA_LABELS_FP)
 
+  """
   # Create validation DataLoader
-  validate_ims_dir = os.path.join(config.DATA_DIR, 'validation')
+  validate_ims_dir = os.path.join(config.DATA_DIR, 'val')
   validate_dataloader = \
     create_rend_dataloader(validate_ims_dir, config.DATA_LABELS_FP)
+  """
+
+  #TODO: set up params for train_model
 
 if __name__ == "__main__":
     main()
