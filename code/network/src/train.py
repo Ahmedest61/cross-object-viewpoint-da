@@ -1,5 +1,6 @@
 import os
 import sys
+import math
 import config
 import datetime
 import time
@@ -48,10 +49,32 @@ def create_model():
   model.fc = nn.Linear(model.fc.in_features, out_classes)
   return model
 
+def ind_to_eulers(ind):
+  azimuth = ind / config.ELEVATION_BINS
+  elevation = (ind % config.ELEVATION_BINS) - (config.ELEVATION_BINS - 90) + 1
+  return azimuth, elevation
+
+def degree_to_radian(degree):
+  return float(degree) * float(math.pi/180)
+
+def radian_to_degree(radian):
+  return float(radian) * float(180/math.pi)
+
+def calc_angle_error(annot, output):
+  annot_azimuth, annot_elevation = ind_to_eulers(annot)
+  out_azimuth, out_elevation = ind_to_eulers(output)
+
+  # TODO: calc central angle error using Great-circle distance
+  one = abs(annot_azimuth - out_azimuth)
+  two = 360 - one
+  azimuth_err = min(one, two)
+  elevation_err = abs(annot_elevation - out_elevation)
+  return azimuth_err, elevation_err 
+
 def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, epochs):
 
   init_time = time.time()
-  best_acc = 0.0
+  best_az_err = best_ele_err = 0.0
   best_weights = model.state_dict()
   best_epoch = -1
 
@@ -68,7 +91,8 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
         dataloader = val_dataloader
 
       # Iterate over dataset
-      epoch_loss = epoch_correct = curr_loss = curr_correct = 0
+      epoch_loss = epoch_az_err = epoch_ele_err = 0
+      curr_loss = curr_az_err = curr_ele_err = 0
       print_interval = 100
       batch_count = 0
       for data in dataloader:
@@ -88,7 +112,10 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
         _, preds = torch.max(outputs.data, 1)
         loss = loss_f(outputs, annots)
         curr_loss += loss.data[0]
-        curr_correct += torch.sum(preds == annots.data)
+        for i in xrange(len(preds)):
+          azimuth_err, elevation_err = calc_angle_error(preds[i], annots.data[i])
+          curr_az_err += azimuth_err
+          curr_ele_err += elevation_err
 
         # Backward pass (if train)
         if phase == "train":
@@ -99,30 +126,35 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
         #if batch_count != 0 and batch_count % (print_interval-1) == 0:
         if batch_count % print_interval == 0 and batch_count != 0:
           epoch_loss += curr_loss
-          epoch_correct += curr_correct
+          epoch_az_err += curr_az_err
+          epoch_ele_err += curr_ele_err
           if phase == "train":
             curr_loss = float(curr_loss) / float(print_interval*config.BATCH_SIZE)
-            curr_correct = float(curr_correct) / float(print_interval*config.BATCH_SIZE)
-            log_print("\tBatches %i-%i -\tLoss: %f \t Acc: %f" % (batch_count-print_interval+1, batch_count, curr_loss, curr_correct))
-          curr_loss = curr_correct = 0
+            curr_az_err = float(curr_az_err) / float(print_interval*config.BATCH_SIZE)
+            curr_ele_err = float(curr_ele_err) / float(print_interval*config.BATCH_SIZE)
+            log_print("\tBatches %i-%i -\tLoss: %f \t Azimuth Err: %f   Elevation Err: %f" % (batch_count-print_interval+1, batch_count, curr_loss, curr_az_err, curr_ele_err))
+          curr_loss = curr_az_err = curr_ele_err = 0
         batch_count += 1
       
       # Report epoch results
       num_images = len(dataloader.dataset)
       epoch_loss = float(epoch_loss+curr_loss) / float(num_images)
-      epoch_acc = float(epoch_correct+curr_correct) / float(num_images)
-      log_print("\tEPOCH %i [%s] - Loss: %f   Acc: %f" % (epoch+1, phase, epoch_loss, epoch_acc))
+      epoch_az_err = float(epoch_az_err+curr_az_err) / float(num_images)
+      epoch_ele_err = float(epoch_ele_err+curr_ele_err) / float(num_images)
+      log_print("\tEPOCH %i [%s] - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (epoch+1, phase, epoch_loss, epoch_az_err, epoch_ele_err))
 
       # Save best model weights from epoch
-      if phase == "val" and epoch_acc >= best_acc:
-        best_acc = epoch_acc
+      err_improvement = (epoch_az_err - best_az_err) + (epoch_ele_err - best_ele_err)
+      if phase == "val" and err_improvement >= 0:
+        best_az_err = epoch_az_err
+        best_ele_err = epoch_ele_err
         best_loss = epoch_loss
         best_weights = model.state_dict()
         best_epoch = epoch
 
   # Finish up
   time_elapsed = time.time() - init_time
-  log_print("BEST EPOCH: %i/%i - Loss: %f   Acc: %f" % (best_epoch+1, epochs, best_loss, best_acc))
+  log_print("BEST EPOCH: %i/%i - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (best_epoch+1, epochs, best_loss, best_az_err, best_ele_err))
   log_print("Training completed in %sm %ss" % (time_elapsed // 60, time_elapsed % 60))
   model.load_state_dict(best_weights)
   return model
@@ -131,7 +163,8 @@ def save_model_weights(model, filepath):
   torch.save(model.state_dict(), filepath)
 
 def test_model(model, test_dataloader, loss_f):
-  test_loss = test_correct = 0
+  #TODO: fix to use angle accuracy metric
+  test_loss = test_az_err = test_ele_err = 0
   print_interval = 100
   batch_count = 0
   for data in test_dataloader:
@@ -150,13 +183,17 @@ def test_model(model, test_dataloader, loss_f):
     _, preds = torch.max(outputs.data, 1)
     loss = loss_f(outputs, annots)
     test_loss += loss.data[0]
-    test_correct += torch.sum(preds == annots.data)
+    for i in xrange(len(preds)):
+      azimuth_err, elevation_err = calc_angle_error(preds[i], annots.data[i])
+      test_az_err += azimuth_err
+      test_ele_err += elevation_err
 
   # Report epoch results
   num_images = len(test_dataloader.dataset)
   test_loss = float(test_loss) / float(num_images)
-  test_acc = float(test_correct) / float(num_images)
-  log_print("[TEST SET] %i ims - Loss: %f   Acc: %f" % (num_images, test_loss, test_acc))
+  test_az_err = float(test_az_err) / float(num_images)
+  test_ele_err = float(test_ele_err) / float(num_images)
+  log_print("[TEST SET] %i ims - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (num_images, test_loss, test_az_err, test_ele_err))
 
 #####################
 #    END HELPERS    #

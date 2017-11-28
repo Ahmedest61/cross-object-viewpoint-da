@@ -1,5 +1,5 @@
 # Filepaths
-RUN_NAME = "rend_only_chair_1"
+RUN_NAME = "rend_only_chair_2"
 DATA_DIR = "../../../data/shapenet/chair/V1"
 DATA_LABELS_FP = "../../../data/shapenet/chair/V1/annots.txt"
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
@@ -16,7 +16,7 @@ ELEVATION_BINS = 135
 RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 50
+EPOCHS = 20
 LEARNING_RATE = 0.001
 MOMENTUM = 0.9
 STEP_SIZE = 8
