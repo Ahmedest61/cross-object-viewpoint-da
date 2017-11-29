@@ -14,6 +14,7 @@ from torchvision import transforms, models
 
 # Imports from src files
 from dataset_rend import RenderedDataset
+from viewpoint_loss import ViewpointLoss
 
 #####################
 #   BEGIN HELPERS   #
@@ -54,10 +55,10 @@ def ind_to_eulers(ind):
   elevation = (ind % config.ELEVATION_BINS) - (config.ELEVATION_BINS - 90) + 1
   return azimuth, elevation
 
-def degree_to_radian(degree):
+def d2r(degree):
   return float(degree) * float(math.pi/180)
 
-def radian_to_degree(radian):
+def r2d(radian):
   return float(radian) * float(180/math.pi)
 
 def calc_angle_error(annot, output):
@@ -144,7 +145,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
       log_print("\tEPOCH %i [%s] - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (epoch+1, phase, epoch_loss, epoch_az_err, epoch_ele_err))
 
       # Save best model weights from epoch
-      err_improvement = (epoch_az_err - best_az_err) + (epoch_ele_err - best_ele_err)
+      err_improvement = (best_az_err - epoch_az_err) + (best_ele_err - epoch_ele_err)
       if phase == "val" and err_improvement >= 0:
         best_az_err = epoch_az_err
         best_ele_err = epoch_ele_err
@@ -163,7 +164,6 @@ def save_model_weights(model, filepath):
   torch.save(model.state_dict(), filepath)
 
 def test_model(model, test_dataloader, loss_f):
-  #TODO: fix to use angle accuracy metric
   test_loss = test_az_err = test_ele_err = 0
   print_interval = 100
   batch_count = 0
@@ -176,7 +176,7 @@ def test_model(model, test_dataloader, loss_f):
       annots = Variable(annots.cuda())
     else:
       inputs = Variable(inputs)
-      annots= Variable(annots)
+      annots = Variable(annots)
 
     # Forward pass and calculate loss
     outputs = model(inputs)
@@ -202,8 +202,8 @@ def test_model(model, test_dataloader, loss_f):
 def main():
 
   # Redirect output to log file
-  sys.stdout = open(config.OUT_LOG_FP, 'w')
-  sys.stderr = sys.stdout
+  #sys.stdout = open(config.OUT_LOG_FP, 'w')
+  #sys.stderr = sys.stdout
   log_print("Beginning script...")
 
   # Print beginning debug info
@@ -233,7 +233,8 @@ def main():
     model = model.cuda()
 
   # Set up loss and optimizer
-  loss_f = nn.CrossEntropyLoss()
+  #loss_f = nn.CrossEntropyLoss()
+  loss_f = ViewpointLoss()
   optimizer = optim.SGD(model.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
