@@ -1,6 +1,5 @@
 # Filepaths
-#RUN_NAME = "rend_only_chair_2"
-RUN_NAME = "TEST"
+RUN_NAME = "rend_only_chair_1"
 DATA_DIR = "../../../data/shapenet/chair/V1"
 DATA_LABELS_FP = "../../../data/shapenet/chair/V1/annots.txt"
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
@@ -12,13 +11,13 @@ GPU = True
 MULTI_GPU = True
 TEST_AFTER_TRAIN = True
 AZIMUTH_BINS = 360
-ELEVATION_BINS = 135
+ELEVATION_BINS = 360
 
 # Learning parameters
 RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 20
+EPOCHS = 50
 LEARNING_RATE = 0.001
 MOMENTUM = 0.9
 STEP_SIZE = 8

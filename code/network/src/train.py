@@ -10,11 +10,12 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-from torchvision import transforms, models
+from torchvision import transforms#, models
 
 # Imports from src files
 from dataset_rend import RenderedDataset
 from viewpoint_loss import ViewpointLoss
+import models
 
 #####################
 #   BEGIN HELPERS   #
@@ -46,36 +47,14 @@ def create_model():
   elif res_v == 152:
     model = models.resnet152(pretrained=config.PRETRAINED)
 
-  out_classes = config.AZIMUTH_BINS * config.ELEVATION_BINS
-  model.fc = nn.Linear(model.fc.in_features, out_classes)
+  model.fc2_azi = nn.Linear(model.fc2_azi.in_features, config.AZIMUTH_BINS)
+  model.fc2_ele = nn.Linear(model.fc2_ele.in_features, config.ELEVATION_BINS)
   return model
-
-def ind_to_eulers(ind):
-  azimuth = ind / config.ELEVATION_BINS
-  elevation = (ind % config.ELEVATION_BINS) - (config.ELEVATION_BINS - 90) + 1
-  return azimuth, elevation
-
-def d2r(degree):
-  return float(degree) * float(math.pi/180)
-
-def r2d(radian):
-  return float(radian) * float(180/math.pi)
-
-def calc_angle_error(annot, output):
-  annot_azimuth, annot_elevation = ind_to_eulers(annot)
-  out_azimuth, out_elevation = ind_to_eulers(output)
-
-  # TODO: calc central angle error using Great-circle distance
-  one = abs(annot_azimuth - out_azimuth)
-  two = 360 - one
-  azimuth_err = min(one, two)
-  elevation_err = abs(annot_elevation - out_elevation)
-  return azimuth_err, elevation_err 
 
 def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, epochs):
 
   init_time = time.time()
-  best_az_err = best_ele_err = 0.0
+  best_loss = best_az_err = best_ele_err = 0.0
   best_weights = model.state_dict()
   best_epoch = -1
 
@@ -97,27 +76,37 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
       print_interval = 100
       batch_count = 0
       for data in dataloader:
-        inputs, annots = data['image'], data['annot']
+        inputs, annot_azimuths, annot_elevations = \
+          data['image'], data['azimuth'], data['elevation']
 
         # Wrap as pytorch autograd Variable
         if config.GPU and torch.cuda.is_available():
           inputs = Variable(inputs.cuda())
-          annots = Variable(annots.cuda())
+          annot_azimuths = Variable(annot_azimuths.cuda())
+          annot_elevations = Variable(annot_elevations.cuda())
         else:
           inputs = Variable(inputs)
-          annots= Variable(annots)
+          annot_azimuths = Variable(annot_azimuths)
+          annot_elevations = Variable(annot_elevations)
 
         # Forward pass and calculate loss
         optimizer.zero_grad()
-        outputs = model(inputs)
-        _, preds = torch.max(outputs.data, 1)
-        loss = loss_f(outputs, annots)
+        out_azimuths, out_elevations = model(inputs)
+        loss_azimuth = loss_f(out_azimuths, annot_azimuths)
+        loss_elevation = loss_f(out_elevations, annot_elevations)
+        loss = loss_azimuth + loss_elevation
         curr_loss += loss.data[0]
-        for i in xrange(len(preds)):
-          azimuth_err, elevation_err = calc_angle_error(preds[i], annots.data[i])
-          curr_az_err += azimuth_err
-          curr_ele_err += elevation_err
 
+        # Update accuracy
+        _, pred_azimuths = torch.max(out_azimuths.data, 1)
+        azimuth_diffs = torch.abs(pred_azimuths - annot_azimuths.data)
+        azimuth_errs = torch.min(azimuth_diffs, 360-azimuth_diffs)
+        curr_az_err += azimuth_errs.sum()
+        _, pred_elevations = torch.max(out_elevations.data, 1)
+        elevation_diffs = torch.abs(pred_elevations - annot_elevations.data)
+        elevation_errs = torch.min(elevation_diffs, 360-elevation_diffs)
+        curr_ele_err += elevation_errs.sum()
+        
         # Backward pass (if train)
         if phase == "train":
           loss.backward()
@@ -146,7 +135,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
 
       # Save best model weights from epoch
       err_improvement = (best_az_err - epoch_az_err) + (best_ele_err - epoch_ele_err)
-      if phase == "val" and err_improvement >= 0:
+      if phase == "val" and (err_improvement >= 0 or epoch == 0):
         best_az_err = epoch_az_err
         best_ele_err = epoch_ele_err
         best_loss = epoch_loss
@@ -168,26 +157,35 @@ def test_model(model, test_dataloader, loss_f):
   print_interval = 100
   batch_count = 0
   for data in test_dataloader:
-    inputs, annots = data['image'], data['annot']
+    inputs, annot_azimuths, annot_elevations = data['image'], data['azimuth'], data['elevation']
 
     # Wrap as pytorch autograd Variable
     if config.GPU and torch.cuda.is_available():
       inputs = Variable(inputs.cuda())
-      annots = Variable(annots.cuda())
+      annot_azimuths = Variable(annot_azimuths.cuda())
+      annot_elevations = Variable(annot_elevations.cuda())
     else:
       inputs = Variable(inputs)
-      annots = Variable(annots)
+      annot_azimuths = Variable(annot_azimuths)
+      annot_elevations = Variable(annot_elevations)
 
     # Forward pass and calculate loss
-    outputs = model(inputs)
-    _, preds = torch.max(outputs.data, 1)
-    loss = loss_f(outputs, annots)
+    out_azimuths, out_elevations = model(inputs)
+    loss_azimuth = loss_f(out_azimuths, annot_azimuths)
+    loss_elevation = loss_f(out_elevations, annot_elevations)
+    loss = loss_azimuth + loss_elevation
     test_loss += loss.data[0]
-    for i in xrange(len(preds)):
-      azimuth_err, elevation_err = calc_angle_error(preds[i], annots.data[i])
-      test_az_err += azimuth_err
-      test_ele_err += elevation_err
 
+    # Update accuracy
+    _, pred_azimuths = torch.max(out_azimuths.data, 1)
+    azimuth_diffs = torch.abs(pred_azimuths - annot_azimuths.data)
+    azimuth_errs = torch.min(azimuth_diffs, 360-azimuth_diffs)
+    test_az_err += azimuth_errs.sum()
+    _, pred_elevations = torch.max(out_elevations.data, 1)
+    elevation_diffs = torch.abs(pred_elevations - annot_elevations.data)
+    elevation_errs = torch.min(elevation_diffs, 360-elevation_diffs)
+    test_ele_err += elevation_errs.sum()
+    
   # Report epoch results
   num_images = len(test_dataloader.dataset)
   test_loss = float(test_loss) / float(num_images)
@@ -233,8 +231,10 @@ def main():
     model = model.cuda()
 
   # Set up loss and optimizer
-  #loss_f = nn.CrossEntropyLoss()
-  loss_f = ViewpointLoss()
+  loss_f = nn.CrossEntropyLoss()
+  if config.GPU and torch.cuda.is_available():
+    loss_f = loss_f.cuda()
+  #loss_f = ViewpointLoss()
   optimizer = optim.SGD(model.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
@@ -259,7 +259,8 @@ def main():
   # Test and report accuracy
   if config.TEST_AFTER_TRAIN:
     log_print("Testing model on test set...")
-    accuracy = test_model(model, test_dataloader, loss_f)
+    predictions = test_model(model, test_dataloader, loss_f)
+    #TODO: print and report accuracy
 
   log_print("Script DONE!")
 

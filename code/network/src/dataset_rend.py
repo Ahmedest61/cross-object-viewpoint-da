@@ -47,11 +47,13 @@ class RenderedDataset(Dataset):
 
     # Fetch annot
     annot = self.images[im_name]    #(azimuth, elevation)
-    num_bins = config.AZIMUTH_BINS * config.ELEVATION_BINS
-    ind = config.ELEVATION_BINS*annot[0] + ((config.ELEVATION_BINS - 90) + annot[1] - 1)
+    azimuth = annot[0]
+    elevation = annot[1]
+    if elevation < 0:
+      elevation = 360 + elevation
 
     # Return sample
-    sample = {"image": image, "annot": ind}
+    sample = {"image": image, "azimuth": azimuth, "elevation": elevation}
     if self.transform:
         sample["image"] = self.transform(sample["image"])
     return sample
