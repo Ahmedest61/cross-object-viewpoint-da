@@ -1,7 +1,7 @@
 # Filepaths
-RUN_NAME = "rend_only_chair_1"
-DATA_DIR = "../../../data/shapenet/chair/V1"
-DATA_LABELS_FP = "../../../data/shapenet/chair/V1/annots.txt"
+RUN_NAME = "rend_only_sofa_1"
+DATA_DIR = "../../../data/shapenet/Sofa_V1"
+DATA_LABELS_FP = "../../../data/shapenet/Sofa_V1/annots.txt"
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
 OUT_LOG_FP = "../logs/%s.log" % RUN_NAME
 OUT_PRED_FP = "../preds/%s.pred" % RUN_NAME
@@ -18,9 +18,9 @@ RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
 EPOCHS = 50
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 MOMENTUM = 0.9
-STEP_SIZE = 8
+STEP_SIZE = 6
 GAMMA = 0.1
 
 # Debugging print method

@@ -199,8 +199,8 @@ def test_model(model, test_dataloader, loss_f):
 def main():
 
   # Redirect output to log file
-  #sys.stdout = open(config.OUT_LOG_FP, 'w')
-  #sys.stderr = sys.stdout
+  sys.stdout = open(config.OUT_LOG_FP, 'w')
+  sys.stderr = sys.stdout
   log_print("Beginning script...")
 
   # Print beginning debug info
