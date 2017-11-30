@@ -14,7 +14,6 @@ from torchvision import transforms#, models
 
 # Imports from src files
 from dataset_rend import RenderedDataset
-from viewpoint_loss import ViewpointLoss
 import models
 
 #####################
@@ -234,7 +233,6 @@ def main():
   loss_f = nn.CrossEntropyLoss()
   if config.GPU and torch.cuda.is_available():
     loss_f = loss_f.cuda()
-  #loss_f = ViewpointLoss()
   optimizer = optim.SGD(model.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
