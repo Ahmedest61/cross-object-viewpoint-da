@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms#, models
 
 # Imports from src files
-from dataset_rend import RenderedDataset
+from data_viewpoint import ViewpointDataset
 import models
 
 #####################
@@ -23,9 +23,10 @@ import models
 def log_print(string):
   print "[%s]\t %s" % (datetime.datetime.now(), string)
 
-def create_rend_dataloader(data_dir, data_labels_fp):
-  dataset = RenderedDataset(data_dir=data_dir, 
-                            data_labels_fp=data_labels_fp,
+def create_rend_dataloader(data_base_dir, data_list, data_set):
+  dataset = ViewpointDataset(data_base_dir=data_base_dir,
+                            data_list=data_list,
+                            data_set=data_set,
                             transform=transforms.Compose([transforms.ToTensor()]))
   dataloader = DataLoader(dataset, 
                           batch_size=config.BATCH_SIZE, 
@@ -58,7 +59,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
   best_epoch = -1
 
   for epoch in xrange(epochs):
-    log_print("Epoch %i/%i" % (epoch+1, epochs))
+    log_print("Epoch %i/%i: %i batches of %i images each" % (epoch+1, epochs, len(train_dataloader.dataset)/config.BATCH_SIZE, config.BATCH_SIZE))
 
     for phase in ["train", "val"]:
       if phase == "train":
@@ -199,8 +200,8 @@ def test_model(model, test_dataloader, loss_f):
 def main():
 
   # Redirect output to log file
-  sys.stdout = open(config.OUT_LOG_FP, 'w')
-  sys.stderr = sys.stdout
+  #sys.stdout = open(config.OUT_LOG_FP, 'w')
+  #sys.stderr = sys.stdout
   log_print("Beginning script...")
 
   # Print beginning debug info
@@ -209,15 +210,13 @@ def main():
 
   # Create training DataLoader
   log_print("Loading training data...")
-  train_ims_dir = os.path.join(config.DATA_DIR, 'train')
   train_dataloader =  \
-    create_rend_dataloader(train_ims_dir, config.DATA_LABELS_FP)
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TRAIN_LIST, 'val')
 
   # Create validation DataLoader
   log_print("Loading validation data...")
-  val_ims_dir = os.path.join(config.DATA_DIR, 'val')
   val_dataloader = \
-    create_rend_dataloader(val_ims_dir, config.DATA_LABELS_FP)
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_VAL_LIST, 'val')
 
   # Set up model for training
   log_print("Creating model...")
@@ -250,9 +249,8 @@ def main():
 
   # Create testing DataLoader
   log_print("Loading testing data...")
-  test_ims_dir = os.path.join(config.DATA_DIR, 'test')
   test_dataloader =  \
-    create_rend_dataloader(test_ims_dir, config.DATA_LABELS_FP)
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TEST_LIST, 'test')
 
   # Test and report accuracy
   if config.TEST_AFTER_TRAIN:
