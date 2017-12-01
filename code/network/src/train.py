@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-from torchvision import transforms#, models
+from torchvision import transforms
 
 # Imports from src files
 from data_viewpoint import ViewpointDataset
@@ -113,7 +113,6 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
           optimizer.step()
 
         # Output
-        #if batch_count != 0 and batch_count % (print_interval-1) == 0:
         if batch_count % print_interval == 0 and batch_count != 0:
           epoch_loss += curr_loss
           epoch_az_err += curr_az_err
@@ -155,9 +154,9 @@ def save_model_weights(model, filepath):
 def test_model(model, test_dataloader, loss_f):
   test_loss = test_az_err = test_ele_err = 0
   print_interval = 100
-  batch_count = 0
+  predictions = []
   for data in test_dataloader:
-    inputs, annot_azimuths, annot_elevations = data['image'], data['azimuth'], data['elevation']
+    im_fps, inputs, annot_azimuths, annot_elevations = data['image_fp'], data['image'], data['azimuth'], data['elevation']
 
     # Wrap as pytorch autograd Variable
     if config.GPU and torch.cuda.is_available():
@@ -185,6 +184,12 @@ def test_model(model, test_dataloader, loss_f):
     elevation_diffs = torch.abs(pred_elevations - annot_elevations.data)
     elevation_errs = torch.min(elevation_diffs, 360-elevation_diffs)
     test_ele_err += elevation_errs.sum()
+
+    for i in xrange(len(im_fps)):
+      if pred_elevations[i] >= 180:
+        predictions.append([im_fps[i], pred_azimuths[i], pred_elevations[i]-360])
+      else:
+        predictions.append([im_fps[i], pred_azimuths[i], pred_elevations[i]])
     
   # Report epoch results
   num_images = len(test_dataloader.dataset)
@@ -193,6 +198,8 @@ def test_model(model, test_dataloader, loss_f):
   test_ele_err = float(test_ele_err) / float(num_images)
   log_print("[TEST SET] %i ims - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (num_images, test_loss, test_az_err, test_ele_err))
 
+  return predictions
+
 #####################
 #    END HELPERS    #
 #####################
@@ -200,8 +207,8 @@ def test_model(model, test_dataloader, loss_f):
 def main():
 
   # Redirect output to log file
-  #sys.stdout = open(config.OUT_LOG_FP, 'w')
-  #sys.stderr = sys.stdout
+  sys.stdout = open(config.OUT_LOG_FP, 'w')
+  sys.stderr = sys.stdout
   log_print("Beginning script...")
 
   # Print beginning debug info
@@ -252,11 +259,15 @@ def main():
   test_dataloader =  \
     create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TEST_LIST, 'test')
 
-  # Test and report accuracy
+  # Test and output accuracy/predictions
   if config.TEST_AFTER_TRAIN:
     log_print("Testing model on test set...")
     predictions = test_model(model, test_dataloader, loss_f)
-    #TODO: print and report accuracy
+    log_print("Writing predictions to %s..." % config.OUT_PRED_FP)
+    out_f = open(config.OUT_PRED_FP, 'w')
+    for p in predictions:
+      out_f.write("%s,%i,%i\n" % (p[0], p[1], p[2]))
+    out_f.close()
 
   log_print("Script DONE!")
 
