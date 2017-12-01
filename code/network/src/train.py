@@ -76,8 +76,9 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
       print_interval = 100
       batch_count = 0
       for data in dataloader:
-        inputs, annot_azimuths, annot_elevations = \
-          data['image'], data['azimuth'], data['elevation']
+        # Gather batch data (images + corersponding annots)
+        im_fps, inputs, annot_azimuths, annot_elevations, annot_classes, annot_domains= \
+          data['image_fp'], data['image'], data['azimuth'], data['elevation'], data['class_id'], data['domain_id']
 
         # Wrap as pytorch autograd Variable
         if config.GPU and torch.cuda.is_available():
@@ -156,7 +157,9 @@ def test_model(model, test_dataloader, loss_f):
   print_interval = 100
   predictions = []
   for data in test_dataloader:
-    im_fps, inputs, annot_azimuths, annot_elevations = data['image_fp'], data['image'], data['azimuth'], data['elevation']
+    # Gather batch data (images + corresponding annots)
+    im_fps, inputs, annot_azimuths, annot_elevations, annot_classes, annot_domains= \
+      data['image_fp'], data['image'], data['azimuth'], data['elevation'], data['class_id'], data['domain_id']
 
     # Wrap as pytorch autograd Variable
     if config.GPU and torch.cuda.is_available():
@@ -218,7 +221,7 @@ def main():
   # Create training DataLoader
   log_print("Loading training data...")
   train_dataloader =  \
-    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TRAIN_LIST, 'val')
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TRAIN_LIST, 'train')
 
   # Create validation DataLoader
   log_print("Loading validation data...")

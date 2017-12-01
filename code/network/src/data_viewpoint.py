@@ -5,6 +5,26 @@ import config
 import numpy as np
 from torch.utils.data import Dataset
 
+class_ids = {
+  "Aeroplane": 0,
+  "Bicycle": 1,
+  "Boat": 2,
+  "Bottle": 3,
+  "Bus": 4,
+  "Car": 5,
+  "Chair": 6,
+  "DiningTable": 7,
+  "Motorbike": 8,
+  "Sofa": 9,
+  "Train": 10,
+  "TvMonitor": 11
+}
+
+domain_ids = {
+  "shapenet": 0,
+  "pascal": 1
+}
+
 class ViewpointDataset(Dataset):
 
   """ 
@@ -50,15 +70,20 @@ class ViewpointDataset(Dataset):
     im_fp = self.ims_list[idx].strip()
     image = cv2.imread(im_fp)
 
-    # Fetch annot
+    # Fetch angle annots
     annot = self.images[im_fp]    #(azimuth, elevation)
     azimuth = annot[0]
     elevation = annot[1]
     if elevation < 0:
       elevation = 360 + elevation
 
+    # Fetch class and domain annots
+    dataset_name = im_fp.split("/")[-3].split(".")[0]
+    class_id = class_ids[dataset_name.split("_")[0]]
+    domain_id = domain_ids[dataset_name.split("_")[1]]
+
     # Return sample
-    sample = {"image_fp": im_fp, "image": image, "azimuth": azimuth, "elevation": elevation}
+    sample = {"image_fp": im_fp, "image": image, "azimuth": azimuth, "elevation": elevation, "class_id": class_id, "domain_id": domain_id}
     if self.transform:
         sample["image"] = self.transform(sample["image"])
     return sample
