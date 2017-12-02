@@ -34,24 +34,21 @@ def create_rend_dataloader(data_base_dir, data_list, data_set):
                           num_workers=4)
   return dataloader
 
-def create_model():
+def create_model(network_type):
   res_v = config.RESNET_LAYERS
-  if res_v == 18:
-    model = models.resnet18(pretrained=config.PRETRAINED)
-  elif res_v == 34:
-    model = models.resnet34(pretrained=config.PRETRAINED)
-  elif res_v == 50:
-    model = models.resnet50(pretrained=config.PRETRAINED)
-  elif res_v == 101:
-    model = models.resnet101(pretrained=config.PRETRAINED)
-  elif res_v == 152:
-    model = models.resnet152(pretrained=config.PRETRAINED)
 
-  model.fc2_azi = nn.Linear(model.fc2_azi.in_features, config.AZIMUTH_BINS)
-  model.fc2_ele = nn.Linear(model.fc2_ele.in_features, config.ELEVATION_BINS)
+  if network_type == "VIEWPOINT":
+    model = models.viewpoint_net(layers=res_v, pretrained=config.PRETRAINED)
+  elif network_type == "VIEWPOINT_CLASS_DOMAIN":
+    model = models.vcd_net(layers=res_v, pretrained=config.PRETRAINED)
+    model.fc2_class = nn.Linear(model.fc2_class.in_features, config.NUM_OBJ_CLASSES)
+
+  # Adjust network size
+  model.fc_azi = nn.Linear(model.fc_azi.in_features, config.AZIMUTH_BINS)
+  model.fc_ele = nn.Linear(model.fc_ele.in_features, config.ELEVATION_BINS)
   return model
 
-def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, epochs):
+def train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer, explorer, epochs):
 
   init_time = time.time()
   best_loss = best_az_err = best_ele_err = 0.0
@@ -85,18 +82,39 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
           inputs = Variable(inputs.cuda())
           annot_azimuths = Variable(annot_azimuths.cuda())
           annot_elevations = Variable(annot_elevations.cuda())
+          annot_classes = Variable(annot_classes.cuda())
+          annot_domains = Variable(annot_domains.cuda())
         else:
           inputs = Variable(inputs)
           annot_azimuths = Variable(annot_azimuths)
           annot_elevations = Variable(annot_elevations)
+          annot_classes = Variable(annot_classes)
+          annot_domains = Variable(annot_domains)
 
         # Forward pass and calculate loss
         optimizer.zero_grad()
-        out_azimuths, out_elevations = model(inputs)
-        loss_azimuth = loss_f(out_azimuths, annot_azimuths)
-        loss_elevation = loss_f(out_elevations, annot_elevations)
-        loss = loss_azimuth + loss_elevation
-        curr_loss += loss.data[0]
+        if config.NETWORK_TYPE == "VIEWPOINT":
+          out_azimuths, out_elevations = model(inputs)
+        elif config.NETWORK_TYPE == "VIEWPOINT_CLASS_DOMAIN":
+          out_azimuths, out_elevations, out_classes, out_domains = model(inputs)
+        
+        # Calculate losses
+        if config.NETWORK_TYPE == "VIEWPOINT":
+          loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
+          loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
+          loss = loss_azimuth + loss_elevation
+          curr_loss += loss.data[0]
+        elif config.NETWORK_TYPE == "VIEWPOINT_CLASS_DOMAIN":
+          loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
+          loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
+          loss_class = loss_f_class(out_classes, annot_classes)
+          loss_domain = loss_f_domain(out_domains, annot_domains.float())
+
+          # TODO: fine tune these values
+          lambda_1 = .1
+          lambda_2 = .1
+          loss = (loss_azimuth + loss_elevation) + lambda_1*loss_class + lambda_2*loss_domain
+          curr_loss += loss.data[0]
 
         # Update accuracy
         _, pred_azimuths = torch.max(out_azimuths.data, 1)
@@ -152,7 +170,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
 def save_model_weights(model, filepath):
   torch.save(model.state_dict(), filepath)
 
-def test_model(model, test_dataloader, loss_f):
+def test_model(model, test_dataloader, loss_f_viewpoint):
   test_loss = test_az_err = test_ele_err = 0
   print_interval = 100
   predictions = []
@@ -172,9 +190,12 @@ def test_model(model, test_dataloader, loss_f):
       annot_elevations = Variable(annot_elevations)
 
     # Forward pass and calculate loss
-    out_azimuths, out_elevations = model(inputs)
-    loss_azimuth = loss_f(out_azimuths, annot_azimuths)
-    loss_elevation = loss_f(out_elevations, annot_elevations)
+    if config.NETWORK_TYPE == "VIEWPOINT":
+      out_azimuths, out_elevations = model(inputs)
+    elif config.NETWORK_TYPE == "VIEWPOINT_CLASS_DOMAIN":
+      out_azimuths, out_elevations, out_classes, out_domains = model(inputs)
+    loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
+    loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
     loss = loss_azimuth + loss_elevation
     test_loss += loss.data[0]
 
@@ -230,18 +251,24 @@ def main():
 
   # Set up model for training
   log_print("Creating model...")
-  model = create_model()
+  model = create_model(config.NETWORK_TYPE)
   if config.GPU and torch.cuda.is_available():
     log_print("Enabling GPU")
     if config.MULTI_GPU and torch.cuda.device_count() > 1:
       log_print("Using multiple GPUs: %i" % torch.cuda.device_count())
       model = nn.DataParallel(model)
     model = model.cuda()
+  else:
+    log_print("Ignoring GPU (CPU only)")
 
   # Set up loss and optimizer
-  loss_f = nn.CrossEntropyLoss()
+  loss_f_viewpoint = nn.CrossEntropyLoss()
+  loss_f_class = nn.CrossEntropyLoss()
+  loss_f_domain = nn.BCELoss()
   if config.GPU and torch.cuda.is_available():
-    loss_f = loss_f.cuda()
+    loss_f_viewpoint  = loss_f_viewpoint.cuda()
+    loss_f_class = loss_f_class.cuda()
+    loss_f_domain = loss_f_domain.cuda()
   optimizer = optim.SGD(model.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
@@ -251,7 +278,7 @@ def main():
 
   # Perform training
   log_print("!!!!!Starting training!!!!!")
-  model = train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, explorer, config.EPOCHS)
+  model = train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer, explorer, config.EPOCHS)
   
   # Save model weights
   log_print("Saving model weights to %s..." % config.OUT_WEIGHTS_FP)
@@ -265,7 +292,7 @@ def main():
   # Test and output accuracy/predictions
   if config.TEST_AFTER_TRAIN:
     log_print("Testing model on test set...")
-    predictions = test_model(model, test_dataloader, loss_f)
+    predictions = test_model(model, test_dataloader, loss_f_viewpoint)
     log_print("Writing predictions to %s..." % config.OUT_PRED_FP)
     out_f = open(config.OUT_PRED_FP, 'w')
     for p in predictions:
