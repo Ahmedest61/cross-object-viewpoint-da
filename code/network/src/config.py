@@ -1,9 +1,9 @@
 # Filepaths
-RUN_NAME = "TEST"
-DATA_BASE_DIR = "../../../data"
-DATA_TRAIN_LIST = ["bicycle_shapenet", "boat_shapenet", "bottle_shapenet", "bus_shapenet", "car_shapenet", "chair_shapenet", "diningtable_shapenet", "motorbike_shapenet", "sofa_shapenet", "train_shapenet", "tvmonitor_shapenet"]
-DATA_VAL_LIST = ["aeroplane_shapenet"]
-DATA_TEST_LIST = ["aeroplane_shapenet"]
+RUN_NAME = "vcd_test_2"
+DATA_BASE_DIR = "../../../data/V2"
+DATA_TRAIN_LIST = ["aeroplane_shapenet_tiny", "bicycle_imagenet", "bicycle_pascal", "bicycle_shapenet", "boat_imagenet", "boat_pascal", "boat_shapenet", "bottle_imagenet", "bottle_pascal", "bottle_shapenet", "bus_imagenet", "bus_pascal", "bus_shapenet", "car_imagenet", "car_pascal", "car_shapenet", "chair_imagenet", "chair_pascal", "chair_shapenet", "diningtable_imagenet", "diningtable_pascal", "diningtable_shapenet", "motorbike_imagenet", "motorbike_pascal", "motorbike_shapenet", "sofa_imagenet", "sofa_pascal", "sofa_shapenet", "train_imagenet", "train_pascal", "train_shapenet", "tvmonitor_imagenet", "tvmonitor_pascal", "tvmonitor_shapenet"]
+DATA_VAL_LIST = ["aeroplane_imagenet", "aeroplane_pascal"]
+DATA_TEST_LIST = ["aeroplane_imagenet", "aeroplane_pascal"]
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
 OUT_LOG_FP = "../logs/%s.log" % RUN_NAME
 OUT_PRED_FP = "../preds/%s.pred" % RUN_NAME
@@ -12,14 +12,16 @@ OUT_PRED_FP = "../preds/%s.pred" % RUN_NAME
 GPU = True
 MULTI_GPU = True
 TEST_AFTER_TRAIN = True
+NETWORK_TYPE = "VIEWPOINT_CLASS_DOMAIN" #VIEWPOINT, VIEWPOINT_CLASS_DOMAIN
 AZIMUTH_BINS = 360
 ELEVATION_BINS = 360
+NUM_OBJ_CLASSES = 12
 
 # Learning parameters
 RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 4
+EPOCHS = 30
 LEARNING_RATE = 0.01
 MOMENTUM = 0.9
 STEP_SIZE = 6
@@ -34,7 +36,7 @@ def PRINT_CONFIG():
   print "RUN_NAME:\t", RUN_NAME
   print "DATA_BASE_DIR:\t", DATA_BASE_DIR
   print "DATA_TRAIN_LIST:\t", DATA_TRAIN_LIST
-  print "DATA_VAL_LIST:\t", DATA_TRAIN_LIST
+  print "DATA_VAL_LIST:\t", DATA_VAL_LIST
   print "DATA_TEST_LIST:\t", DATA_TEST_LIST
   print "OUT_WEIGHTS_FP:\t", OUT_WEIGHTS_FP
   print "OUT_LOG_FP:\t", OUT_LOG_FP
@@ -45,8 +47,10 @@ def PRINT_CONFIG():
   print "GPU:\t", GPU
   print "MULTI_GPU:\t", MULTI_GPU
   print "TEST_AFTER_TRAIN:\t", TEST_AFTER_TRAIN
+  print "NETWORK_TYPE:\t", NETWORK_TYPE
   print "AZIMUTH_BINS:\t", AZIMUTH_BINS
   print "ELEVATION_BINS:\t", ELEVATION_BINS
+  print "NUM_OBJ_CLASSES:\t", NUM_OBJ_CLASSES
   print ""
 
   print "~~LEARNING PARAMS~~"
@@ -61,3 +65,7 @@ def PRINT_CONFIG():
   print ""
 
   print "~~~~~~ END CONFIG ~~~~~~"
+
+
+
+#DATA_TRAIN_LIST = ["bicycle_imagenet", "bicycle_pascal", "boat_imagenet", "boat_pascal", "bottle_imagenet", "bottle_pascal", "bus_imagenet", "bus_pascal", "car_imagenet", "car_pascal", "chair_imagenet", "chair_pascal", "diningtable_imagenet", "diningtable_pascal", "motorbike_imagenet", "motorbike_pascal", "sofa_imagenet", "sofa_pascal", "train_imagenet", "train_pascal", "tvmonitor_imagenet", "tvmonitor_pascal"]

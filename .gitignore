@@ -5,6 +5,7 @@ data/
 lists
 models
 out
+preds
 
 
 # Byte-compiled / optimized / DLL files
