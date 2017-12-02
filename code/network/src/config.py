@@ -1,7 +1,7 @@
 # Filepaths
-RUN_NAME = "vdc_test_1"
-DATA_BASE_DIR = "../../../data"
-DATA_TRAIN_LIST = ["bicycle_imagenet", "bicycle_pascal", "bicycle_shapenet", "boat_imagenet", "boat_pascal", "boat_shapenet", "bottle_imagenet", "bottle_pascal", "bottle_shapenet", "bus_imagenet", "bus_pascal", "bus_shapenet", "car_imagenet", "car_pascal", "car_shapenet", "chair_imagenet", "chair_pascal", "chair_shapenet", "diningtable_imagenet", "diningtable_pascal", "diningtable_shapenet", "motorbike_imagenet", "motorbike_pascal", "motorbike_shapenet", "sofa_imagenet", "sofa_pascal", "sofa_shapenet", "train_imagenet", "train_pascal", "train_shapenet", "tvmonitor_imagenet", "tvmonitor_pascal", "tvmonitor_shapenet"]
+RUN_NAME = "vcd_test_2"
+DATA_BASE_DIR = "../../../data/V2"
+DATA_TRAIN_LIST = ["aeroplane_shapenet_tiny", "bicycle_imagenet", "bicycle_pascal", "bicycle_shapenet", "boat_imagenet", "boat_pascal", "boat_shapenet", "bottle_imagenet", "bottle_pascal", "bottle_shapenet", "bus_imagenet", "bus_pascal", "bus_shapenet", "car_imagenet", "car_pascal", "car_shapenet", "chair_imagenet", "chair_pascal", "chair_shapenet", "diningtable_imagenet", "diningtable_pascal", "diningtable_shapenet", "motorbike_imagenet", "motorbike_pascal", "motorbike_shapenet", "sofa_imagenet", "sofa_pascal", "sofa_shapenet", "train_imagenet", "train_pascal", "train_shapenet", "tvmonitor_imagenet", "tvmonitor_pascal", "tvmonitor_shapenet"]
 DATA_VAL_LIST = ["aeroplane_imagenet", "aeroplane_pascal"]
 DATA_TEST_LIST = ["aeroplane_imagenet", "aeroplane_pascal"]
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
@@ -21,7 +21,7 @@ NUM_OBJ_CLASSES = 12
 RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 15
+EPOCHS = 30
 LEARNING_RATE = 0.01
 MOMENTUM = 0.9
 STEP_SIZE = 6
