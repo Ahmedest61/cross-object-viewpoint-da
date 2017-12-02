@@ -1,7 +1,9 @@
 # Filepaths
-RUN_NAME = "rend_only_sofa_1"
-DATA_DIR = "../../../data/shapenet/Sofa_V1"
-DATA_LABELS_FP = "../../../data/shapenet/Sofa_V1/annots.txt"
+RUN_NAME = "TEST"
+DATA_BASE_DIR = "../../../data"
+DATA_TRAIN_LIST = ["bicycle_shapenet", "boat_shapenet", "bottle_shapenet", "bus_shapenet", "car_shapenet", "chair_shapenet", "diningtable_shapenet", "motorbike_shapenet", "sofa_shapenet", "train_shapenet", "tvmonitor_shapenet"]
+DATA_VAL_LIST = ["aeroplane_shapenet"]
+DATA_TEST_LIST = ["aeroplane_shapenet"]
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
 OUT_LOG_FP = "../logs/%s.log" % RUN_NAME
 OUT_PRED_FP = "../preds/%s.pred" % RUN_NAME
@@ -17,7 +19,7 @@ ELEVATION_BINS = 360
 RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
 BATCH_SIZE = 30
-EPOCHS = 50
+EPOCHS = 4
 LEARNING_RATE = 0.01
 MOMENTUM = 0.9
 STEP_SIZE = 6
@@ -30,8 +32,10 @@ def PRINT_CONFIG():
 
   print "~~FILEPATHS~~"
   print "RUN_NAME:\t", RUN_NAME
-  print "DATA_DIR:\t", DATA_DIR
-  print "DATA_LABELS_FP:\t", DATA_LABELS_FP
+  print "DATA_BASE_DIR:\t", DATA_BASE_DIR
+  print "DATA_TRAIN_LIST:\t", DATA_TRAIN_LIST
+  print "DATA_VAL_LIST:\t", DATA_TRAIN_LIST
+  print "DATA_TEST_LIST:\t", DATA_TEST_LIST
   print "OUT_WEIGHTS_FP:\t", OUT_WEIGHTS_FP
   print "OUT_LOG_FP:\t", OUT_LOG_FP
   print "OUT_PRED_FP:\t", OUT_PRED_FP

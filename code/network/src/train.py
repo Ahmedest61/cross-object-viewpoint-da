@@ -10,10 +10,10 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-from torchvision import transforms#, models
+from torchvision import transforms
 
 # Imports from src files
-from dataset_rend import RenderedDataset
+from data_viewpoint import ViewpointDataset
 import models
 
 #####################
@@ -23,9 +23,10 @@ import models
 def log_print(string):
   print "[%s]\t %s" % (datetime.datetime.now(), string)
 
-def create_rend_dataloader(data_dir, data_labels_fp):
-  dataset = RenderedDataset(data_dir=data_dir, 
-                            data_labels_fp=data_labels_fp,
+def create_rend_dataloader(data_base_dir, data_list, data_set):
+  dataset = ViewpointDataset(data_base_dir=data_base_dir,
+                            data_list=data_list,
+                            data_set=data_set,
                             transform=transforms.Compose([transforms.ToTensor()]))
   dataloader = DataLoader(dataset, 
                           batch_size=config.BATCH_SIZE, 
@@ -58,7 +59,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
   best_epoch = -1
 
   for epoch in xrange(epochs):
-    log_print("Epoch %i/%i" % (epoch+1, epochs))
+    log_print("Epoch %i/%i: %i batches of %i images each" % (epoch+1, epochs, len(train_dataloader.dataset)/config.BATCH_SIZE, config.BATCH_SIZE))
 
     for phase in ["train", "val"]:
       if phase == "train":
@@ -75,8 +76,9 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
       print_interval = 100
       batch_count = 0
       for data in dataloader:
-        inputs, annot_azimuths, annot_elevations = \
-          data['image'], data['azimuth'], data['elevation']
+        # Gather batch data (images + corersponding annots)
+        im_fps, inputs, annot_azimuths, annot_elevations, annot_classes, annot_domains= \
+          data['image_fp'], data['image'], data['azimuth'], data['elevation'], data['class_id'], data['domain_id']
 
         # Wrap as pytorch autograd Variable
         if config.GPU and torch.cuda.is_available():
@@ -112,7 +114,6 @@ def train_model(model, train_dataloader, val_dataloader, loss_f, optimizer, expl
           optimizer.step()
 
         # Output
-        #if batch_count != 0 and batch_count % (print_interval-1) == 0:
         if batch_count % print_interval == 0 and batch_count != 0:
           epoch_loss += curr_loss
           epoch_az_err += curr_az_err
@@ -154,9 +155,11 @@ def save_model_weights(model, filepath):
 def test_model(model, test_dataloader, loss_f):
   test_loss = test_az_err = test_ele_err = 0
   print_interval = 100
-  batch_count = 0
+  predictions = []
   for data in test_dataloader:
-    inputs, annot_azimuths, annot_elevations = data['image'], data['azimuth'], data['elevation']
+    # Gather batch data (images + corresponding annots)
+    im_fps, inputs, annot_azimuths, annot_elevations, annot_classes, annot_domains= \
+      data['image_fp'], data['image'], data['azimuth'], data['elevation'], data['class_id'], data['domain_id']
 
     # Wrap as pytorch autograd Variable
     if config.GPU and torch.cuda.is_available():
@@ -184,6 +187,12 @@ def test_model(model, test_dataloader, loss_f):
     elevation_diffs = torch.abs(pred_elevations - annot_elevations.data)
     elevation_errs = torch.min(elevation_diffs, 360-elevation_diffs)
     test_ele_err += elevation_errs.sum()
+
+    for i in xrange(len(im_fps)):
+      if pred_elevations[i] >= 180:
+        predictions.append([im_fps[i], pred_azimuths[i], pred_elevations[i]-360])
+      else:
+        predictions.append([im_fps[i], pred_azimuths[i], pred_elevations[i]])
     
   # Report epoch results
   num_images = len(test_dataloader.dataset)
@@ -191,6 +200,8 @@ def test_model(model, test_dataloader, loss_f):
   test_az_err = float(test_az_err) / float(num_images)
   test_ele_err = float(test_ele_err) / float(num_images)
   log_print("[TEST SET] %i ims - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (num_images, test_loss, test_az_err, test_ele_err))
+
+  return predictions
 
 #####################
 #    END HELPERS    #
@@ -209,15 +220,13 @@ def main():
 
   # Create training DataLoader
   log_print("Loading training data...")
-  train_ims_dir = os.path.join(config.DATA_DIR, 'train')
   train_dataloader =  \
-    create_rend_dataloader(train_ims_dir, config.DATA_LABELS_FP)
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TRAIN_LIST, 'train')
 
   # Create validation DataLoader
   log_print("Loading validation data...")
-  val_ims_dir = os.path.join(config.DATA_DIR, 'val')
   val_dataloader = \
-    create_rend_dataloader(val_ims_dir, config.DATA_LABELS_FP)
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_VAL_LIST, 'val')
 
   # Set up model for training
   log_print("Creating model...")
@@ -250,15 +259,18 @@ def main():
 
   # Create testing DataLoader
   log_print("Loading testing data...")
-  test_ims_dir = os.path.join(config.DATA_DIR, 'test')
   test_dataloader =  \
-    create_rend_dataloader(test_ims_dir, config.DATA_LABELS_FP)
+    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TEST_LIST, 'test')
 
-  # Test and report accuracy
+  # Test and output accuracy/predictions
   if config.TEST_AFTER_TRAIN:
     log_print("Testing model on test set...")
     predictions = test_model(model, test_dataloader, loss_f)
-    #TODO: print and report accuracy
+    log_print("Writing predictions to %s..." % config.OUT_PRED_FP)
+    out_f = open(config.OUT_PRED_FP, 'w')
+    for p in predictions:
+      out_f.write("%s,%i,%i\n" % (p[0], p[1], p[2]))
+    out_f.close()
 
   log_print("Script DONE!")
 
