@@ -3,5 +3,3 @@
 Network:
 [1] Write basic geometric loss function to replace CrossEntropyLoss
 [2] Subtract mean image from ims
-[3] Write test set predictions to file
-[3] Test azimuth/elevation accuracy reporting

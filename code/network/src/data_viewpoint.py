@@ -22,6 +22,7 @@ class_ids = {
 
 domain_ids = {
   "shapenet": 0,
+  "imagenet": 1,
   "pascal": 1
 }
 
