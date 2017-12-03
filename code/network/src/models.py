@@ -187,6 +187,8 @@ class VCDNet(nn.Module):
         self.fc = nn.Linear(512 * block.expansion, num_classes) # intermediate embedding
 
         # Viewpoint classifier
+        self.fc_viewpoint = nn.Linear(num_classes, num_classes)
+        #self.fc2_viewpoint = nn.Linear(num_classes, num_classes)
         self.fc_azi = nn.Linear(num_classes, 360)
         self.fc_ele = nn.Linear(num_classes, 360)
 
@@ -241,8 +243,10 @@ class VCDNet(nn.Module):
         x = self.fc(x)
 
         # Viewpoint
-        azimuth = self.fc_azi(x)
-        elevation = self.fc_ele(x)
+        x_viewpoint = self.fc_viewpoint(x)
+        #x_viewpoint = self.fc2_viewpoint(x_viewpoint)
+        azimuth = self.fc_azi(x_viewpoint)
+        elevation = self.fc_ele(x_viewpoint)
         
         # Object class
         x_class = self.grad_r_class(x)
