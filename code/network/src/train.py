@@ -14,6 +14,7 @@ from torchvision import transforms
 
 # Imports from src files
 from data_viewpoint import ViewpointDataset
+from viewpoint_loss import ViewpointLoss
 import models
 
 #####################
@@ -260,7 +261,8 @@ def main():
     log_print("Ignoring GPU (CPU only)")
 
   # Set up loss and optimizer
-  loss_f_viewpoint = nn.CrossEntropyLoss()
+  #loss_f_viewpoint = nn.CrossEntropyLoss()
+  loss_f_viewpoint = ViewpointLoss()
   loss_f_class = nn.CrossEntropyLoss()
   loss_f_domain = nn.BCELoss()
   if config.GPU and torch.cuda.is_available():
