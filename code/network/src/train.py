@@ -111,9 +111,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_
           loss_domain = loss_f_domain(out_domains, annot_domains.float())
 
           # TODO: fine tune these values
-          lambda_1 = .35
-          lambda_2 = .35
-          loss = (loss_azimuth + loss_elevation) + lambda_1*loss_class + lambda_2*loss_domain
+          loss = (loss_azimuth + loss_elevation) + config.LAMBDA_CLASS*loss_class + config.LAMBDA_DOMAIN*loss_domain
           curr_loss += loss.data[0]
 
         # Update accuracy
