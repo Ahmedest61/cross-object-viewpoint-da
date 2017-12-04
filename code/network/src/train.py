@@ -14,6 +14,7 @@ from torchvision import transforms
 
 # Imports from src files
 from data_viewpoint import ViewpointDataset
+from viewpoint_loss import ViewpointLoss
 import models
 
 #####################
@@ -111,9 +112,7 @@ def train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_
           loss_domain = loss_f_domain(out_domains, annot_domains.float())
 
           # TODO: fine tune these values
-          lambda_1 = .35
-          lambda_2 = .35
-          loss = (loss_azimuth + loss_elevation) + lambda_1*loss_class + lambda_2*loss_domain
+          loss = (loss_azimuth + loss_elevation) + config.LAMBDA_CLASS*loss_class + config.LAMBDA_DOMAIN*loss_domain
           curr_loss += loss.data[0]
 
         # Update accuracy
@@ -262,7 +261,8 @@ def main():
     log_print("Ignoring GPU (CPU only)")
 
   # Set up loss and optimizer
-  loss_f_viewpoint = nn.CrossEntropyLoss()
+  #loss_f_viewpoint = nn.CrossEntropyLoss()
+  loss_f_viewpoint = ViewpointLoss()
   loss_f_class = nn.CrossEntropyLoss()
   loss_f_domain = nn.BCELoss()
   if config.GPU and torch.cuda.is_available():

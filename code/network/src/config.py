@@ -1,9 +1,14 @@
 # Filepaths
-RUN_NAME = "vcd_test_2"
-DATA_BASE_DIR = "../../../data/V2"
-DATA_TRAIN_LIST = ["aeroplane_shapenet_tiny", "bicycle_imagenet", "bicycle_pascal", "bicycle_shapenet", "boat_imagenet", "boat_pascal", "boat_shapenet", "bottle_imagenet", "bottle_pascal", "bottle_shapenet", "bus_imagenet", "bus_pascal", "bus_shapenet", "car_imagenet", "car_pascal", "car_shapenet", "chair_imagenet", "chair_pascal", "chair_shapenet", "diningtable_imagenet", "diningtable_pascal", "diningtable_shapenet", "motorbike_imagenet", "motorbike_pascal", "motorbike_shapenet", "sofa_imagenet", "sofa_pascal", "sofa_shapenet", "train_imagenet", "train_pascal", "train_shapenet", "tvmonitor_imagenet", "tvmonitor_pascal", "tvmonitor_shapenet"]
-DATA_VAL_LIST = ["aeroplane_imagenet", "aeroplane_pascal"]
-DATA_TEST_LIST = ["aeroplane_imagenet", "aeroplane_pascal"]
+RUN_NAME = "viewpoint-loss-test"
+RUN_DESCRIPTION = "simple test to make sure viewpoint loss is working"
+DATA_BASE_DIR = "../../../data/V1"
+#DATA_TRAIN_LIST = ["aeroplane_imagenet", "aeroplane_pascal", "aeroplane_shapenet", "bicycle_imagenet", "bicycle_pascal", "bicycle_shapenet", "boat_imagenet", "boat_pascal", "boat_shapenet", "bottle_imagenet", "bottle_pascal", "bottle_shapenet", "bus_imagenet", "bus_pascal", "bus_shapenet", "car_shapenet_tiny", "chair_imagenet", "chair_pascal", "chair_shapenet", "diningtable_imagenet", "diningtable_pascal", "diningtable_shapenet", "motorbike_imagenet", "motorbike_pascal", "motorbike_shapenet", "sofa_imagenet", "sofa_pascal", "sofa_shapenet", "train_imagenet", "train_pascal", "train_shapenet", "tvmonitor_imagenet", "tvmonitor_pascal", "tvmonitor_shapenet"]
+#DATA_TRAIN_LIST = ["aeroplane_imagenet", "aeroplane_pascal", "aeroplane_shapenet", "bicycle_imagenet", "bicycle_pascal", "bicycle_shapenet", "boat_imagenet", "boat_pascal", "boat_shapenet", "bus_imagenet", "bus_pascal", "bus_shapenet", "motorbike_imagenet", "motorbike_pascal", "motorbike_shapenet", "train_imagenet", "train_pascal", "train_shapenet", "car_shapenet_tiny"]
+DATA_TRAIN_LIST = ["car_shapenet"]
+#DATA_VAL_LIST = ["car_imagenet", "car_pascal"]
+DATA_VAL_LIST = ["car_shapenet"]
+#DATA_TEST_LIST = ["car_imagenet", "car_pascal"]
+DATA_TEST_LIST = ["car_shapenet"]
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
 OUT_LOG_FP = "../logs/%s.log" % RUN_NAME
 OUT_PRED_FP = "../preds/%s.pred" % RUN_NAME
@@ -26,6 +31,8 @@ LEARNING_RATE = 0.01
 MOMENTUM = 0.9
 STEP_SIZE = 6
 GAMMA = 0.1
+LAMBDA_CLASS = 0
+LAMBDA_DOMAIN = 0
 
 # Debugging print method
 def PRINT_CONFIG():
@@ -34,6 +41,7 @@ def PRINT_CONFIG():
 
   print "~~FILEPATHS~~"
   print "RUN_NAME:\t", RUN_NAME
+  print "RUN_DESCRIPTION:\t", RUN_DESCRIPTION
   print "DATA_BASE_DIR:\t", DATA_BASE_DIR
   print "DATA_TRAIN_LIST:\t", DATA_TRAIN_LIST
   print "DATA_VAL_LIST:\t", DATA_VAL_LIST
@@ -62,6 +70,8 @@ def PRINT_CONFIG():
   print "MOMENTUM:\t", MOMENTUM
   print "STEP_SIZE:\t", STEP_SIZE
   print "GAMMA:\t", GAMMA
+  print "LAMBDA_CLASS:\t", LAMBDA_CLASS
+  print "LAMBDA_DOMAIN:\t", LAMBDA_DOMAIN
   print ""
 
   print "~~~~~~ END CONFIG ~~~~~~"
