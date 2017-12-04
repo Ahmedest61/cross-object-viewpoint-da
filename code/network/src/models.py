@@ -265,7 +265,7 @@ def viewpoint_net(layers=18, pretrained=False, **kwargs):
     if layers == 18:
         layer_struct = [2,2,2,2]
         component = BasicBlock
-    elif layers == 37:
+    elif layers == 34:
         layer_struct = [3,4,6,3]
         component = BasicBlock
     elif layers == 50:
@@ -289,7 +289,7 @@ def vcd_net(layers=18, pretrained=False, **kwargs):
     if layers == 18:
         layer_struct = [2,2,2,2]
         component = BasicBlock
-    elif layers == 37:
+    elif layers == 34:
         layer_struct = [3,4,6,3]
         component = BasicBlock
     elif layers == 50:

@@ -32,14 +32,13 @@ class ViewpointLoss(nn.Module):
         # Set absolute minimum for numerical stability (assuming float16 - 6x10^-5)
         # preds = F.softmax(preds.float())
         #labels = labels.float()
-        batch_size = preds.size(0)
         loss     = torch.zeros(1)
 
         if torch.cuda.is_available():
             loss = loss.cuda()
         loss = torch.autograd.Variable(loss)
 
-        for inst_id in range(batch_size):
+        for inst_id in range(preds.size(0)):
 
             # Prep label vector
             label_vec = torch.zeros(self.class_period)
