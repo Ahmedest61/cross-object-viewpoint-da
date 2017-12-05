@@ -1,9 +1,9 @@
 # Script to calculate AVP for certain bin size, given preds file and gt annots file
 
 # Input vars
-preds_fp = "../network/preds/aeroplane/aeroplane-avp-SupervisedBoth-NoDA.pred"
-annots_fp1 = "../../data/V2/aeroplane_imagenet/annots.txt" 
-annots_fp2 = "../../data/V2/aeroplane_pascal/annots.txt" 
+preds_fp = "../network/preds/sofa_ADDA.pred"
+annots_fp1 = "/home/arjun/research/viewpoint-da/data/V2/sofa_imagenet/annots.txt" 
+annots_fp2 = "/home/arjun/research/viewpoint-da/data/V2/sofa_pascal/annots.txt" 
 bin_views = [4, 8, 16, 24]
 
 # Read preds

@@ -63,27 +63,28 @@ class Discriminator(nn.Module):
     self.fc1 = nn.Linear(nFeat, nFeat)
     self.fc2 = nn.Linear(nFeat, nClass)
   def forward(self, input):
-    x = self.fc1(x)
+    x = self.fc1(input)
     x = self.fc2(x)
     return x
 
 def split_model(model):
   encoder = model
-  encoder.module.grad_r_class = nn.ReLU()
-  encoder.module.fc_class = nn.ReLU()
-  encoder.module.fc2_class = nn.ReLU()
+  encoder.grad_r_class = nn.ReLU()
+  encoder.fc_class = nn.ReLU()
+  encoder.fc2_class = nn.ReLU()
   
-  encoder.module.grad_r_domain = nn.ReLU()
-  encoder.module.fc_domain = nn.ReLU()
-  encoder.module.fc2_domain = nn.ReLU()
+  encoder.grad_r_domain = nn.ReLU()
+  encoder.fc_domain = nn.ReLU()
+  encoder.fc2_domain = nn.ReLU()
   
   discriminator_class = Discriminator(nClass = 12 + 1)
   discriminator_domain = Discriminator(nClass = 2)
+  
 
   
   return encoder, discriminator_class, discriminator_domain
 
-def train_model(encoder, discriminator_class, discriminator_domain, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer_encoder, optimizer_class, optimizer_domain, explorer, epochs):
+def train_adda(encoder, discriminator_class, discriminator_domain, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer_encoder, optimizer_class, optimizer_domain, explorer, epochs):
 
   init_time = time.time()
   best_loss = best_az_err = best_ele_err = 0.0
@@ -114,18 +115,21 @@ def train_model(encoder, discriminator_class, discriminator_domain, train_datalo
           data['image_fp'], data['image'], data['azimuth'], data['elevation'], data['class_id'], data['domain_id']
 
         # Wrap as pytorch autograd Variable
+        inv_annot_domains = 1 - annot_domains.clone()
         if config.GPU and torch.cuda.is_available():
           inputs = Variable(inputs.cuda())
           annot_azimuths = Variable(annot_azimuths.cuda())
           annot_elevations = Variable(annot_elevations.cuda())
           annot_classes = Variable(annot_classes.cuda())
           annot_domains = Variable(annot_domains.cuda())
+          inv_annot_domains = Variable(inv_annot_domains.cuda())
         else:
           inputs = Variable(inputs)
           annot_azimuths = Variable(annot_azimuths)
           annot_elevations = Variable(annot_elevations)
           annot_classes = Variable(annot_classes)
           annot_domains = Variable(annot_domains)
+          inv_annot_domains = Variable(inv_annot_domains)
 
         # Forward pass and calculate loss
         #optimizer.zero_grad()
@@ -135,16 +139,16 @@ def train_model(encoder, discriminator_class, discriminator_domain, train_datalo
           out_azimuths, out_elevations, feat, _ = encoder(inputs)
           out_classes = discriminator_class(feat)
           out_domains = discriminator_domain(feat)
-          loss_class = loss_f_class(out_classes, annot_classes)
-          loss_domain = loss_f_domain(out_domains, annot_domains.float())
+          loss_class = loss_f_class(out_classes, annot_classes.long())
+          loss_domain = loss_f_domain(out_domains, annot_domains.long())
           loss = config.LAMBDA_CLASS*loss_class + config.LAMBDA_DOMAIN*loss_domain
           loss.backward()
           optimizer_class.step()
           optimizer_domain.step()
           pred_cls = torch.squeeze(out_classes.max(1)[1])
-          curr_cls_err += (pred_cls == annot_classes).float().mean()
+          curr_cls_acc += (pred_cls == annot_classes).float().mean().data[0]
           pred_dom = torch.squeeze(out_domains.max(1)[1])
-          curr_dom_err += (pred_dom == annot_domains).float().mean()
+          curr_dom_acc += (pred_dom == annot_domains).float().mean().data[0]
           
         optimizer_class.zero_grad()
         optimizer_domain.zero_grad()
@@ -153,9 +157,9 @@ def train_model(encoder, discriminator_class, discriminator_domain, train_datalo
         out_classes = discriminator_class(feat)
         out_domains = discriminator_domain(feat)
         loss_class = loss_f_class(out_classes, annot_classes)
-        loss_domain = loss_f_domain(out_domains, annot_domains.float())
-        loss_class = loss_f_class(out_classes, torch.ones(out_classes.size(0) * config.NUM_OBJ_CLASSES)
-        loss_domain = loss_f_domain(out_domains, 1 - annot_domains.float())
+        loss_domain = loss_f_domain(out_domains, annot_domains.long())
+        loss_class = loss_f_class(out_classes, Variable(torch.ones(out_classes.size(0)).long().cuda() * config.NUM_OBJ_CLASSES))
+        loss_domain = loss_f_domain(out_domains, inv_annot_domains.long())
         loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
         loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
         loss = (loss_azimuth + loss_elevation) + config.LAMBDA_CLASS*loss_class + config.LAMBDA_DOMAIN*loss_domain
@@ -186,6 +190,8 @@ def train_model(encoder, discriminator_class, discriminator_domain, train_datalo
             curr_loss = float(curr_loss) / float(print_interval*config.BATCH_SIZE)
             curr_az_err = float(curr_az_err) / float(print_interval*config.BATCH_SIZE)
             curr_ele_err = float(curr_ele_err) / float(print_interval*config.BATCH_SIZE)
+            curr_cls_acc = float(curr_cls_acc) / float(print_interval*config.BATCH_SIZE)
+            curr_dom_acc = float(curr_dom_acc) / float(print_interval*config.BATCH_SIZE)
             log_print("\tBatches %i-%i -\tLoss: %f \t Azimuth Err: %f   Elevation Err: %f \t Class Acc: %f Domain Acc: %f " % (batch_count-print_interval+1, batch_count, curr_loss, curr_az_err, curr_ele_err, curr_cls_acc, curr_dom_acc))
           curr_loss = curr_az_err = curr_ele_err = 0
           curr_cls_acc = curr_dom_acc = 0
@@ -204,15 +210,15 @@ def train_model(encoder, discriminator_class, discriminator_domain, train_datalo
         best_az_err = epoch_az_err
         best_ele_err = epoch_ele_err
         best_loss = epoch_loss
-        best_weights = model.state_dict()
+        best_weights = encoder.state_dict()
         best_epoch = epoch
 
   # Finish up
   time_elapsed = time.time() - init_time
   log_print("BEST EPOCH: %i/%i - Loss: %f   Azimuth Err: %f   Elevation Err: %f" % (best_epoch+1, epochs, best_loss, best_az_err, best_ele_err))
   log_print("Training completed in %sm %ss" % (time_elapsed // 60, time_elapsed % 60))
-  model.load_state_dict(best_weights)
-  return model
+  encoder.load_state_dict(best_weights)
+  return encoder
 
 def save_model_weights(model, filepath):
   torch.save(model.state_dict(), filepath)
@@ -278,7 +284,7 @@ def test_model(model, test_dataloader, loss_f_viewpoint):
 def main():
 
   # Redirect output to log file
-  sys.stdout = open(config.OUT_LOG_FP, 'w')
+  #sys.stdout = open(config.OUT_LOG_FP, 'w')
   sys.stderr = sys.stdout
   log_print("Beginning script...")
 
@@ -304,23 +310,24 @@ def main():
     log_print("Enabling GPU")
     if config.MULTI_GPU and torch.cuda.device_count() > 1:
       log_print("Using multiple GPUs: %i" % torch.cuda.device_count())
-      #model = nn.DataParallel(model)
+      encoder = nn.DataParallel(encoder)
       discriminator_class = nn.DataParallel(discriminator_class)
       discriminator_domain = nn.DataParallel(discriminator_domain)
     discriminator_class = discriminator_class.cuda()
     discriminator_domain = discriminator_domain.cuda()
+    encoder = encoder.cuda()
   else:
     log_print("Ignoring GPU (CPU only)")
 
   # Set up loss and optimizer
   loss_f_viewpoint = nn.CrossEntropyLoss()
   loss_f_class = nn.CrossEntropyLoss()
-  loss_f_domain = nn.BCELoss()
+  loss_f_domain = nn.CrossEntropyLoss()
   if config.GPU and torch.cuda.is_available():
     loss_f_viewpoint  = loss_f_viewpoint.cuda()
     loss_f_class = loss_f_class.cuda()
     loss_f_domain = loss_f_domain.cuda()
-  optimizer_encoder = optim.SGD(model.parameters(), 
+  optimizer_encoder = optim.SGD(encoder.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
   optimizer_class = optim.SGD(discriminator_class.parameters(), 
@@ -335,7 +342,7 @@ def main():
 
   # Perform training
   log_print("!!!!!Starting training!!!!!")
-  model = train_adda(encoder, discriminator_class, discriminator_domain, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer_encoder, optimizer_class, optimizer_domain, explorer, config.EPOCHS)
+  encoder = train_adda(encoder, discriminator_class, discriminator_domain, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer_encoder, optimizer_class, optimizer_domain, explorer, config.EPOCHS)
   
   # Save model weights
   log_print("Saving model weights to %s..." % config.OUT_WEIGHTS_FP)
@@ -349,7 +356,7 @@ def main():
   # Test and output accuracy/predictions
   if config.TEST_AFTER_TRAIN:
     log_print("Testing model on test set...")
-    predictions = test_model(model, test_dataloader, loss_f_viewpoint)
+    predictions = test_model(encoder, test_dataloader, loss_f_viewpoint)
     log_print("Writing predictions to %s..." % config.OUT_PRED_FP)
     out_f = open(config.OUT_PRED_FP, 'w')
     for p in predictions:
