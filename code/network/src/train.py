@@ -15,6 +15,7 @@ from torchvision import transforms
 # Imports from src files
 from data_viewpoint import ViewpointDataset
 from viewpoint_loss import ViewpointLoss
+from mmd_loss import MMDLoss
 import models
 
 #####################
@@ -24,7 +25,7 @@ import models
 def log_print(string):
   print "[%s]\t %s" % (datetime.datetime.now(), string)
 
-def create_rend_dataloader(data_base_dir, data_list, data_set):
+def create_dataloader(data_base_dir, data_list, data_set):
   dataset = ViewpointDataset(data_base_dir=data_base_dir,
                             data_list=data_list,
                             data_set=data_set,
@@ -43,13 +44,15 @@ def create_model(network_type):
   elif network_type == "VIEWPOINT_CLASS_DOMAIN":
     model = models.vcd_net(layers=res_v, pretrained=config.PRETRAINED)
     model.fc2_class = nn.Linear(model.fc2_class.in_features, config.NUM_OBJ_CLASSES)
+  elif network_type == "SIMPLE":
+    model = models.resnet_experiment(bottleneck_size=config.BOTTLENECK_SIZE, layers=res_v, pretrained=config.PRETRAINED)
 
   # Adjust network size
   model.fc_azi = nn.Linear(model.fc_azi.in_features, config.AZIMUTH_BINS)
   model.fc_ele = nn.Linear(model.fc_ele.in_features, config.ELEVATION_BINS)
   return model
 
-def train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer, explorer, epochs):
+def train_model(model, train_dataloader, regular_dataloader, val_dataloader, loss_f_viewpoint, loss_f_mmd, optimizer, explorer, epochs):
 
   init_time = time.time()
   best_loss = best_az_err = best_ele_err = 0.0
@@ -73,7 +76,13 @@ def train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_
       curr_loss = curr_az_err = curr_ele_err = 0
       print_interval = 100
       batch_count = 0
+
+      # Create regularizer dataloader iterator
+      if regular_dataloader is not None:
+        regular_iter = iter(regular_dataloader)
+
       for data in dataloader:
+
         # Gather batch data (images + corersponding annots)
         im_fps, inputs, annot_azimuths, annot_elevations, annot_classes, annot_domains= \
           data['image_fp'], data['image'], data['azimuth'], data['elevation'], data['class_id'], data['domain_id']
@@ -94,26 +103,34 @@ def train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_
 
         # Forward pass and calculate loss
         optimizer.zero_grad()
-        if config.NETWORK_TYPE == "VIEWPOINT":
-          out_azimuths, out_elevations = model(inputs)
-        elif config.NETWORK_TYPE == "VIEWPOINT_CLASS_DOMAIN":
-          out_azimuths, out_elevations, out_classes, out_domains = model(inputs)
-        
-        # Calculate losses
-        if config.NETWORK_TYPE == "VIEWPOINT":
-          loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
-          loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
-          loss = loss_azimuth + loss_elevation
-          curr_loss += loss.data[0]
-        elif config.NETWORK_TYPE == "VIEWPOINT_CLASS_DOMAIN":
-          loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
-          loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
-          loss_class = loss_f_class(out_classes, annot_classes)
-          loss_domain = loss_f_domain(out_domains, annot_domains.float())
+        out_azimuths, out_elevations = model(inputs)
 
-          # TODO: fine tune these values
-          loss = (loss_azimuth + loss_elevation) + config.LAMBDA_CLASS*loss_class + config.LAMBDA_DOMAIN*loss_domain
-          curr_loss += loss.data[0]
+        # Regularizer
+        embeddings = model.get_embedding()
+        if regular_dataloader is not None:
+          while True:
+            regular_data = next(regular_iter)
+            if regular_data['azimuth'].size(0) == config.BATCH_SIZE:
+              break
+            regular_iter = iter(regular_dataloader)
+
+          regular_inputs = regular_data['image']
+          if config.GPU and torch.cuda.is_available():
+            regular_inputs = Variable(regular_inputs.cuda())
+          else:
+            regular_inputs = Variable(regular_inputs)
+          _,_ = model(regular_inputs)
+          regular_embeddings = model.get_embedding()
+
+        # Calculate losses
+        loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
+        loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
+        if regular_dataloader is not None:
+          loss_mmd = loss_f_mmd(embeddings, regular_embeddings)
+        else:
+          loss_mmd = 0
+        loss = (loss_azimuth + loss_elevation) + (config.LAMBDA_MMD * loss_mmd)
+        curr_loss += loss.data[0]
 
         # Update accuracy
         _, pred_azimuths = torch.max(out_azimuths.data, 1)
@@ -189,7 +206,7 @@ def test_model(model, test_dataloader, loss_f_viewpoint):
       annot_elevations = Variable(annot_elevations)
 
     # Forward pass and calculate loss
-    if config.NETWORK_TYPE == "VIEWPOINT":
+    if config.NETWORK_TYPE == "VIEWPOINT" or config.NETWORK_TYPE == "SIMPLE":
       out_azimuths, out_elevations = model(inputs)
     elif config.NETWORK_TYPE == "VIEWPOINT_CLASS_DOMAIN":
       out_azimuths, out_elevations, out_classes, out_domains = model(inputs)
@@ -241,12 +258,17 @@ def main():
   # Create training DataLoader
   log_print("Loading training data...")
   train_dataloader =  \
-    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TRAIN_LIST, 'train')
+    create_dataloader(config.DATA_BASE_DIR, config.DATA_TRAIN_LIST, 'train')
+  if config.DATA_REGULAR_LIST is not None:
+    regular_dataloader = \
+      create_dataloader(config.DATA_BASE_DIR, config.DATA_REGULAR_LIST, 'train')
+  else:
+    regular_dataloader = None
 
   # Create validation DataLoader
   log_print("Loading validation data...")
   val_dataloader = \
-    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_VAL_LIST, 'val')
+    create_dataloader(config.DATA_BASE_DIR, config.DATA_VAL_LIST, 'val')
 
   # Set up model for training
   log_print("Creating model...")
@@ -262,13 +284,10 @@ def main():
 
   # Set up loss and optimizer
   loss_f_viewpoint = nn.CrossEntropyLoss()
-  #loss_f_viewpoint = ViewpointLoss()
-  loss_f_class = nn.CrossEntropyLoss()
-  loss_f_domain = nn.BCELoss()
+  loss_f_mmd = MMDLoss()
   if config.GPU and torch.cuda.is_available():
     loss_f_viewpoint  = loss_f_viewpoint.cuda()
-    loss_f_class = loss_f_class.cuda()
-    loss_f_domain = loss_f_domain.cuda()
+    loss_f_mmd = loss_f_mmd.cuda()
   optimizer = optim.SGD(model.parameters(), 
                         lr=config.LEARNING_RATE,
                         momentum=config.MOMENTUM)
@@ -278,7 +297,7 @@ def main():
 
   # Perform training
   log_print("!!!!!Starting training!!!!!")
-  model = train_model(model, train_dataloader, val_dataloader, loss_f_viewpoint, loss_f_class, loss_f_domain, optimizer, explorer, config.EPOCHS)
+  model = train_model(model, train_dataloader, regular_dataloader, val_dataloader, loss_f_viewpoint, loss_f_mmd, optimizer, explorer, config.EPOCHS)
   
   # Save model weights
   log_print("Saving model weights to %s..." % config.OUT_WEIGHTS_FP)
@@ -287,7 +306,7 @@ def main():
   # Create testing DataLoader
   log_print("Loading testing data...")
   test_dataloader =  \
-    create_rend_dataloader(config.DATA_BASE_DIR, config.DATA_TEST_LIST, 'test')
+    create_dataloader(config.DATA_BASE_DIR, config.DATA_TEST_LIST, 'test')
 
   # Test and output accuracy/predictions
   if config.TEST_AFTER_TRAIN:

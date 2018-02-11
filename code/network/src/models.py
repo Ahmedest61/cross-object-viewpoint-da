@@ -187,10 +187,10 @@ class VCDNet(nn.Module):
         self.fc = nn.Linear(512 * block.expansion, num_classes) # intermediate embedding
 
         # Viewpoint classifier
-        self.fc_viewpoint = nn.Linear(num_classes, num_classes)
+        self.fc_viewpoint = nn.Linear(num_classes, 64)
         #self.fc2_viewpoint = nn.Linear(num_classes, num_classes)
-        self.fc_azi = nn.Linear(num_classes, 360)
-        self.fc_ele = nn.Linear(num_classes, 360)
+        self.fc_azi = nn.Linear(64, 360)
+        self.fc_ele = nn.Linear(64, 360)
 
         # Object classifier
         self.grad_r_class = GradReverse()
@@ -261,6 +261,93 @@ class VCDNet(nn.Module):
 
         return azimuth, elevation, class_, domain
 
+class SimpleNetwork(nn.Module):
+
+    def __init__(self, bottleneck_size, block, layers, num_classes=1000):
+        self.inplanes = 64
+        super(SimpleNetwork, self).__init__()
+        self.hook_store = []
+
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.avgpool = nn.AvgPool2d(7, stride=1)
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        # Intermediate embedding generation
+        if bottleneck_size == 0:
+            embedding_size = num_classes
+        else:
+            embedding_size = bottleneck_size
+        self.fc_embedding = nn.Linear(num_classes, embedding_size)
+        self.fc_embedding.register_forward_hook(self.store_embedding)
+        self.fc2 = nn.Linear(embedding_size, num_classes)
+
+        # Output
+        self.fc_azi = nn.Linear(num_classes, 360)
+        self.fc_ele = nn.Linear(num_classes, 360)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+
+    def store_embedding(self, _, input, output):
+        self.hook_store.append(output)
+
+    def get_embedding(self):
+        out = self.hook_store.pop(0)
+        return out
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.relu(self.fc(x))
+        x = self.relu(self.fc_embedding(x))
+        x = self.fc2(x)
+
+        azimuth = self.fc_azi(x)
+        elevation = self.fc_ele(x)
+
+        return azimuth, elevation
+
+
 def viewpoint_net(layers=18, pretrained=False, **kwargs):
     if layers == 18:
         layer_struct = [2,2,2,2]
@@ -303,6 +390,31 @@ def vcd_net(layers=18, pretrained=False, **kwargs):
         component = Bottleneck
 
     model = VCDNet(component, layer_struct, **kwargs)
+    if pretrained:
+        state = model.state_dict()
+        state.update(model_zoo.load_url(model_urls['resnet%i' % layers]))
+        model.load_state_dict(state)
+    return model
+
+def resnet_experiment(bottleneck_size=0, layers=18, pretrained=False, **kwargs):
+    if layers == 18:
+        layer_struct = [2,2,2,2]
+        component = BasicBlock
+    elif layers == 34:
+        layer_struct = [3,4,6,3]
+        component = BasicBlock
+    elif layers == 50:
+        layer_struct = [3,4,6,3]
+        component = Bottleneck
+    elif layers == 101:
+        layer_struct = [3,4,23,3]
+        component = Bottleneck
+    elif layers == 152:
+        layer_struct = [3,8,36,3]
+        component = Bottleneck
+
+    model = SimpleNetwork(bottleneck_size, component, layer_struct, **kwargs)
+
     if pretrained:
         state = model.state_dict()
         state.update(model_zoo.load_url(model_urls['resnet%i' % layers]))
