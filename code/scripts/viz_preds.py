@@ -6,10 +6,12 @@ import matplotlib
 import pylab as plt
 
 # INPUTS
-pred_name = "multi-nocar-real.pred"
+pred_name = "multi-test-both.pred"
 gts = ["car_imagenet", "car_pascal"]
-sample_size = 5000;
-DISP = "BOTH" # 'PREDS', 'GT', or 'BOTH'
+sample_size = 1000;
+DISP = "PREDS" # 'PREDS', 'GT', or 'BOTH'
+x_min, x_max = -20, 380
+y_min, y_max = -20, 60
 
 base_dir = os.path.join("..", "..")
 preds_fp = os.path.join(base_dir, "code", "network", "preds", pred_name)
@@ -78,5 +80,7 @@ if DISP == "GT" or DISP == "BOTH":
 plt.title('Predictions vs Ground Truth:\n %s, %s ' % (pred_name, "&".join(gts)))
 plt.xlabel('Azimuth (in degrees)')
 plt.ylabel('Elevation (in degrees)')
+plt.xlim([x_min, x_max])
+plt.ylim([y_min, y_max])
 plt.legend(loc=2)
 plt.show()
