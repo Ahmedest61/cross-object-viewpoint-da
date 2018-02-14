@@ -1,9 +1,9 @@
 # Filepaths
-RUN_NAME = "test-nutter-butter"
-RUN_DESCRIPTION = "supervised car, rend to rend"
+RUN_NAME = "test-car-rend2real"
+RUN_DESCRIPTION = "trained on rend data, testing on real data"
 DATA_BASE_DIR = "../../../data/V2"
-DATA_TEST_LIST = ["car_shapenet"]
-IN_WEIGHTS_FP = "../models/car-real-supervised.pt"
+DATA_TEST_LIST = ["car_imagenet", "car_pascal"]
+IN_WEIGHTS_FP = "../models/car-rend-supervised.pt"
 OUT_LOG_FP = "../logs/%s.log" % RUN_NAME
 OUT_PRED_FP = "../preds/%s.pred" % RUN_NAME
 

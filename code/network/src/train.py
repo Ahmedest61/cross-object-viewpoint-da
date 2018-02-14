@@ -78,7 +78,7 @@ def train_model(model, train_dataloader, regular_dataloader, val_dataloader, los
       batch_count = 0
 
       # Create regularizer dataloader iterator
-      if regular_dataloader is not None:
+      if regular_dataloader is not None and phase == "train":
         regular_iter = iter(regular_dataloader)
 
       for data in dataloader:
@@ -106,8 +106,8 @@ def train_model(model, train_dataloader, regular_dataloader, val_dataloader, los
         out_azimuths, out_elevations = model(inputs)
 
         # Regularizer
-        embeddings = model.get_embedding()
-        if regular_dataloader is not None:
+        if regular_dataloader is not None and phase == "train":
+          embeddings = model.get_embedding()
           while True:
             regular_data = next(regular_iter)
             if regular_data['azimuth'].size(0) == config.BATCH_SIZE:
@@ -125,7 +125,7 @@ def train_model(model, train_dataloader, regular_dataloader, val_dataloader, los
         # Calculate losses
         loss_azimuth = loss_f_viewpoint(out_azimuths, annot_azimuths)
         loss_elevation = loss_f_viewpoint(out_elevations, annot_elevations)
-        if regular_dataloader is not None:
+        if regular_dataloader is not None and phase == "train":
           loss_mmd = loss_f_mmd(embeddings, regular_embeddings)
         else:
           loss_mmd = 0
@@ -146,6 +146,8 @@ def train_model(model, train_dataloader, regular_dataloader, val_dataloader, los
         if phase == "train":
           loss.backward()
           optimizer.step()
+          if regular_dataloader is not None:
+            del embeddings, regular_embeddings
 
         # Output
         if batch_count % print_interval == 0 and batch_count != 0:

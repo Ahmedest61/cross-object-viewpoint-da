@@ -266,7 +266,7 @@ class SimpleNetwork(nn.Module):
     def __init__(self, bottleneck_size, block, layers, num_classes=1000):
         self.inplanes = 64
         super(SimpleNetwork, self).__init__()
-        self.hook_store = []
+        self.hook_store = 0
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
@@ -302,10 +302,11 @@ class SimpleNetwork(nn.Module):
                 m.bias.data.zero_()
 
     def store_embedding(self, _, input, output):
-        self.hook_store.append(output)
+        self.hook_store = output
 
     def get_embedding(self):
-        out = self.hook_store.pop(0)
+        out = self.hook_store
+        del self.hook_store
         return out
 
     def _make_layer(self, block, planes, blocks, stride=1):

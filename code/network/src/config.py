@@ -1,10 +1,10 @@
 # Filepaths
-RUN_NAME = "test"
-RUN_DESCRIPTION = "test test test"
+RUN_NAME = "multi-test-both-3"
+RUN_DESCRIPTION = "multi-test with bottleneck and mmd (larger lambda)"
 DATA_BASE_DIR = "../../../data/V2"
-DATA_TRAIN_LIST = ["car_shapenet"]
-#DATA_REGULAR_LIST = ["car_imagenet", "car_pascal"]
-DATA_REGULAR_LIST = None
+DATA_TRAIN_LIST = ["aeroplane_imagenet", "aeroplane_pascal", "bicycle_imagenet", "bicycle_pascal", "boat_imagenet", "boat_pascal", "bottle_imagenet", "bottle_pascal", "bus_imagenet", "bus_pascal", "chair_imagenet", "chair_pascal", "diningtable_imagenet", "diningtable_pascal", "motorbike_imagenet", "motorbike_pascal", "sofa_imagenet", "sofa_pascal", "train_imagenet", "train_pascal", "tvmonitor_imagenet", "tvmonitor_pascal"]
+DATA_REGULAR_LIST = ["car_imagenet", "car_pascal"]
+#DATA_REGULAR_LIST = None
 DATA_VAL_LIST = ["car_imagenet", "car_pascal"]
 DATA_TEST_LIST = ["car_imagenet", "car_pascal"]
 OUT_WEIGHTS_FP = "../models/%s.pt" % RUN_NAME
@@ -16,7 +16,7 @@ GPU = True
 MULTI_GPU = True
 TEST_AFTER_TRAIN = True
 NETWORK_TYPE = "SIMPLE" #VIEWPOINT, VIEWPOINT_CLASS_DOMAIN, SIMPLE
-BOTTLENECK_SIZE = 0
+BOTTLENECK_SIZE = 256
 AZIMUTH_BINS = 360
 ELEVATION_BINS = 360
 NUM_OBJ_CLASSES = 12
@@ -24,13 +24,13 @@ NUM_OBJ_CLASSES = 12
 # Learning parameters
 RESNET_LAYERS = 18 #18, 34, 50, 101, 152
 PRETRAINED = True
-BATCH_SIZE = 60
-EPOCHS = 1
+BATCH_SIZE = 100
+EPOCHS = 20
 LEARNING_RATE = 0.01
 MOMENTUM = 0.9
-STEP_SIZE = 6
+STEP_SIZE = 4
 GAMMA = 0.1
-LAMBDA_MMD = 0.25
+LAMBDA_MMD = 0.75
 
 # Debugging print method
 def PRINT_CONFIG():
