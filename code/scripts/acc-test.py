@@ -1,12 +1,18 @@
-# Script to calculate AVP for certain bin size, given preds file and gt annots file
+# Script to calculate Acc-theta for certain bin size, given preds file and gt annots file
+
+import sys
+from math import pi, acos, cos, sin
 
 # Input vars
-preds_fp = "../network/preds/multi-test-bottleneck.pred"
+preds_fp = "../network/preds/multi-test-mmd.pred"
 annots_fps = [ \
   "../../data/V2/car_imagenet/annots.txt", \
   "../../data/V2/car_pascal/annots.txt" \
 ]
-bin_views = [4, 8, 16, 24]
+thetas = [2, 3, 4, 6]
+
+def degree_to_radian(degree):
+  return ((float(degree)*pi)/180.0)
 
 # Read preds
 preds_f = open(preds_fp, 'r')
@@ -26,12 +32,11 @@ for a in annots:
   annots_map[a[0]] = [a[1], a[2]]
 
 # Init
-for b in bin_views:
-  bin_size = 360 / b 
-  correct_az = 0
-  correct_ele = 0
-  total_az = 0
-  total_ele = 0
+for theta in thetas:
+  correct = 0
+  total = 0
+
+  theta_pi = pi / float(theta)
 
   # Calc AVP
   for p in preds:
@@ -49,22 +54,25 @@ for b in bin_views:
       pred_ele += 360
     if annot_ele < 0:
       annot_ele += 360
-  
+
+    pred_az = degree_to_radian(pred_az)
+    pred_ele = degree_to_radian(pred_ele)
+    annot_az = degree_to_radian(annot_az)
+    annot_ele = degree_to_radian(annot_ele)
+
     # Bin and test
-    pred_az_bin = pred_az / bin_size
-    pred_ele_bin = pred_ele / bin_size
-    annot_az_bin = annot_az / bin_size
-    annot_ele_bin = annot_ele / bin_size
-    if pred_az_bin == annot_az_bin:
-      correct_az += 1
-    if pred_ele_bin == annot_ele_bin:
-      correct_ele += 1
-    total_az += 1
-    total_ele += 1
+    inside = sin(pred_ele)*sin(annot_ele) + cos(pred_ele)*cos(annot_ele)*cos(abs(pred_az-annot_az))
+    if abs(inside - 1.0) < 0.0001:
+        correct += 1
+        total += 1
+        continue
+    diff = acos(inside)
+    if diff <= theta_pi:
+      correct += 1
+    total += 1
   
   # Report AVP
   print "~"*10
   print preds_fp
-  print "BINS: %iV" % b 
-  print "AZIMUTH AVP: %f" % (float(correct_az)/float(total_az))
-  print "ELEVATION AVP: %f" % (float(correct_ele)/float(total_ele))
+  print "THETA: PI/%i" % theta
+  print "ACCURACY: %f (%i / %i)" % ((float(correct)/float(total)), correct, total)
